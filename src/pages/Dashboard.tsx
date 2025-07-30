@@ -147,6 +147,18 @@ const Dashboard = () => {
 
   const REQUIRED_CONTRIBUTION = 105000; // 105,000 RWF
 
+  const getCurrentMonthContributions = (contributions: Contribution[]) => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    return contributions
+      .filter(
+        (c) =>
+          c.status === "completed" && new Date(c.payment_date) >= startOfMonth
+      )
+      .reduce((sum, c) => sum + c.amount, 0);
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const {
@@ -227,7 +239,7 @@ const Dashboard = () => {
       setContributions(contributionsData || []);
 
       // Load loans with type assertion
-      const { data: loansData, error: loansError } = await supabase
+      const { data: loansData, error: loansError } = (await supabase
         .from("loans")
         .select(
           `
@@ -246,10 +258,10 @@ const Dashboard = () => {
         `
         )
         .eq("user_id", user.id)
-        .order("applied_at", { ascending: false }) as { 
-          data: DbLoan[] | null;
-          error: any;
-        };
+        .order("applied_at", { ascending: false })) as {
+        data: DbLoan[] | null;
+        error: any;
+      };
 
       if (loansError) throw loansError;
 
@@ -268,16 +280,16 @@ const Dashboard = () => {
         total_with_interest: loan.total_with_interest || loan.amount * 1.05,
         amount_paid: loan.amount_paid || 0,
         last_payment_date: loan.last_payment_date,
-        payment_schedule: (loan.loan_payments || []).map(payment => ({
+        payment_schedule: (loan.loan_payments || []).map((payment) => ({
           id: payment.id,
           loan_id: payment.loan_id,
           amount: payment.amount,
           due_date: payment.due_date,
           paid_amount: payment.paid_amount || 0,
           paid_date: payment.paid_date,
-          status: payment.status as "pending" | "paid" | "overdue"
+          status: payment.status as "pending" | "paid" | "overdue",
         })),
-        installments_count: loan.installments_count || 3
+        installments_count: loan.installments_count || 3,
       })) as Loan[];
 
       setLoans(transformedLoans);
@@ -532,9 +544,7 @@ const Dashboard = () => {
     }
   };
 
-  const totalContributions = contributions
-    .filter((c) => c.status === "completed")
-    .reduce((sum, c) => sum + c.amount, 0);
+  const totalContributions = getCurrentMonthContributions(contributions);
 
   const contributionProgress = Math.min(
     (totalContributions / REQUIRED_CONTRIBUTION) * 100,
@@ -646,27 +656,49 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span>
-                    {totalContributions.toLocaleString()} /{" "}
-                    {REQUIRED_CONTRIBUTION.toLocaleString()} RWF
-                  </span>
+              {contributionProgress >= 100 ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-green-800">
+                        Monthly Contribution Complete!
+                      </p>
+                      <p className="text-green-700">
+                        You've met your contribution requirement for{" "}
+                        {new Date().toLocaleString("default", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                        . The next contribution period starts on{" "}
+                        {new Date(
+                          new Date().getFullYear(),
+                          new Date().getMonth() + 1,
+                          1
+                        ).toLocaleDateString()}
+                        .
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <Progress value={contributionProgress} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  {contributionProgress >= 100 ? (
-                    <span className="text-green-600 font-medium">
-                      ✓ Contribution requirement met!
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>
+                      {totalContributions.toLocaleString()} /{" "}
+                      {REQUIRED_CONTRIBUTION.toLocaleString()} RWF
                     </span>
-                  ) : (
-                    `${(
+                  </div>
+                  <Progress value={contributionProgress} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {(
                       REQUIRED_CONTRIBUTION - totalContributions
-                    ).toLocaleString()} RWF remaining`
-                  )}
-                </p>
-              </div>
+                    ).toLocaleString()}{" "}
+                    RWF remaining
+                  </p>
+                </div>
+              )}
 
               {contributionProgress < 100 && (
                 <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
@@ -677,8 +709,11 @@ const Dashboard = () => {
                         Action Required
                       </p>
                       <p className="text-yellow-700">
-                        Complete your contribution within 3 months to maintain
-                        active membership.
+                        Complete your contribution for{" "}
+                        {new Date().toLocaleString("default", {
+                          month: "long",
+                        })}{" "}
+                        to maintain active membership.
                       </p>
                     </div>
                   </div>
@@ -841,37 +876,50 @@ const Dashboard = () => {
               <CardDescription>Your current loan status</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {loans.filter(loan => loan.status === "approved").map(loan => (
-                <div key={loan.id} className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Total Loan</span>
-                      <span>{loan.total_with_interest.toLocaleString()} RWF</span>
+              {loans
+                .filter((loan) => loan.status === "approved")
+                .map((loan) => (
+                  <div key={loan.id} className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Total Loan</span>
+                        <span>
+                          {loan.total_with_interest.toLocaleString()} RWF
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Amount Paid</span>
+                        <span>{loan.amount_paid.toLocaleString()} RWF</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-medium bg-secondary/20 p-2 rounded-md">
+                        <span>Remaining Balance</span>
+                        <span>
+                          {(
+                            loan.total_with_interest - loan.amount_paid
+                          ).toLocaleString()}{" "}
+                          RWF
+                        </span>
+                      </div>
+                      {loan.last_payment_date && (
+                        <p className="text-xs text-muted-foreground">
+                          Last payment:{" "}
+                          {new Date(
+                            loan.last_payment_date
+                          ).toLocaleDateString()}
+                        </p>
+                      )}
+                      <Progress
+                        value={
+                          (loan.amount_paid / loan.total_with_interest) * 100
+                        }
+                        className="mt-2"
+                      />
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Amount Paid</span>
-                      <span>{loan.amount_paid.toLocaleString()} RWF</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-medium bg-secondary/20 p-2 rounded-md">
-                      <span>Remaining Balance</span>
-                      <span>
-                        {(loan.total_with_interest - loan.amount_paid).toLocaleString()} RWF
-                      </span>
-                    </div>
-                    {loan.last_payment_date && (
-                      <p className="text-xs text-muted-foreground">
-                        Last payment: {new Date(loan.last_payment_date).toLocaleDateString()}
-                      </p>
-                    )}
-                    <Progress 
-                      value={(loan.amount_paid / loan.total_with_interest) * 100} 
-                      className="mt-2"
-                    />
+                    <Separator />
                   </div>
-                  <Separator />
-                </div>
-              ))}
-              {loans.filter(loan => loan.status === "approved").length === 0 && (
+                ))}
+              {loans.filter((loan) => loan.status === "approved").length ===
+                0 && (
                 <div className="text-center text-sm text-muted-foreground">
                   No active loans
                 </div>
