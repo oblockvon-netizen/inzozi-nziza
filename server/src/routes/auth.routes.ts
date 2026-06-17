@@ -120,16 +120,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.post(
-    "/logout",
-    { preHandler: [requireAuth] },
-    async (request, reply) => {
+  app.post("/logout", async (request, reply) => {
       const refreshToken = request.cookies[COOKIE_NAMES.refresh];
       await logout(refreshToken, request.authUser?.id);
       clearAuthCookies(reply);
       return reply.send({ message: "Logged out successfully" });
-    }
-  );
+    });
 
   app.post(
     "/forgot-password",

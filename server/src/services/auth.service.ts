@@ -11,6 +11,7 @@ import {
 } from "../lib/email.js";
 import { AppError } from "../utils/errors.js";
 import type { AuthUser, SessionMeta } from "../types/auth.js";
+import { buildAuthUser } from "./user.service.js";
 import type {
   ForgotPasswordInput,
   LoginInput,
@@ -38,30 +39,6 @@ async function getUserRoleId(): Promise<string> {
     throw new AppError(500, "USER role is not configured. Run database seed.", "ROLE_MISSING");
   }
   return role.id;
-}
-
-async function buildAuthUser(userId: string): Promise<AuthUser> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      profile: true,
-      userRoles: { include: { role: true } },
-    },
-  });
-
-  if (!user?.profile) {
-    throw new AppError(404, "User not found", "USER_NOT_FOUND");
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    roles: user.userRoles.map((ur) => ur.role.name),
-    emailVerified: Boolean(user.emailVerifiedAt),
-    isApproved: user.profile.isApproved,
-    status: user.profile.status,
-    fullName: user.profile.fullName,
-  };
 }
 
 async function issueTokens(userId: string, meta: SessionMeta): Promise<AuthTokens> {
@@ -373,5 +350,3 @@ export async function changePassword(
     data: { passwordHash },
   });
 }
-
-export { buildAuthUser };

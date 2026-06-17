@@ -55,3 +55,22 @@ export const authRateLimits = {
     },
   },
 } as const;
+
+export const adminRateLimits = {
+  default: {
+    config: {
+      rateLimit: {
+        max: 100,
+        timeWindow: "15 minutes",
+      },
+    },
+  },
+  mutations: {
+    config: {
+      rateLimit: {
+        max: 60,
+        timeWindow: "15 minutes",
+      },
+    },
+  },
+} as const;

@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AppRole } from "@prisma/client";
 import { AppError } from "../utils/errors.js";
 
+/** @deprecated Use requireAccessRole or requirePermission from role/permissions middleware */
 export function requireRoles(...roles: AppRole[]) {
   return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
     if (!request.authUser) {
@@ -16,4 +17,4 @@ export function requireRoles(...roles: AppRole[]) {
 }
 
 export const requireUser = requireRoles("USER", "ADMIN");
-export const requireAdminRole = requireRoles("ADMIN");
+export const requireAdminDbRole = requireRoles("ADMIN");

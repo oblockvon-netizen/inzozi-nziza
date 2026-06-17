@@ -1,33 +1,8 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { verifyAccessToken } from "../lib/jwt.js";
-import { prisma } from "../lib/prisma.js";
 import { AppError } from "../utils/errors.js";
 import { COOKIE_NAMES } from "../utils/cookies.js";
-import type { AuthUser } from "../types/auth.js";
-
-async function loadAuthUser(userId: string): Promise<AuthUser | null> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      profile: true,
-      userRoles: { include: { role: true } },
-    },
-  });
-
-  if (!user || !user.profile) {
-    return null;
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    roles: user.userRoles.map((ur) => ur.role.name),
-    emailVerified: Boolean(user.emailVerifiedAt),
-    isApproved: user.profile.isApproved,
-    status: user.profile.status,
-    fullName: user.profile.fullName,
-  };
-}
+import { buildAuthUser } from "../services/user.service.js";
 
 function extractAccessToken(request: FastifyRequest): string | undefined {
   const cookieToken = request.cookies[COOKIE_NAMES.access];
@@ -43,10 +18,7 @@ function extractAccessToken(request: FastifyRequest): string | undefined {
   return undefined;
 }
 
-export async function requireAuth(
-  request: FastifyRequest,
-  _reply: FastifyReply
-): Promise<void> {
+async function attachAuthUser(request: FastifyRequest): Promise<void> {
   const token = extractAccessToken(request);
   if (!token) {
     throw new AppError(401, "Authentication required", "UNAUTHORIZED");
@@ -59,12 +31,21 @@ export async function requireAuth(
     throw new AppError(401, "Invalid or expired access token", "INVALID_TOKEN");
   }
 
-  const authUser = await loadAuthUser(payload.sub);
-  if (!authUser) {
-    throw new AppError(401, "User not found", "UNAUTHORIZED");
+  try {
+    request.authUser = await buildAuthUser(payload.sub);
+  } catch (error) {
+    if (error instanceof AppError && error.statusCode === 404) {
+      throw new AppError(401, "User not found", "UNAUTHORIZED");
+    }
+    throw error;
   }
+}
 
-  request.authUser = authUser;
+export async function requireAuth(
+  request: FastifyRequest,
+  _reply: FastifyReply
+): Promise<void> {
+  await attachAuthUser(request);
 }
 
 export async function optionalAuth(
@@ -78,10 +59,7 @@ export async function optionalAuth(
 
   try {
     const payload = verifyAccessToken(token);
-    const authUser = await loadAuthUser(payload.sub);
-    if (authUser) {
-      request.authUser = authUser;
-    }
+    request.authUser = await buildAuthUser(payload.sub);
   } catch {
     // Optional auth — ignore invalid tokens
   }
@@ -96,20 +74,22 @@ export async function requireEmailVerified(
   }
 }
 
+/** @deprecated Use requireAccessRole('USER') or requirePermission instead */
 export async function requireApprovedMember(
   request: FastifyRequest,
   _reply: FastifyReply
 ): Promise<void> {
-  if (!request.authUser?.isApproved || request.authUser.status !== "ACTIVE") {
+  if (request.authUser?.accessRole !== "USER") {
     throw new AppError(403, "Account pending admin approval", "ACCOUNT_NOT_APPROVED");
   }
 }
 
+/** @deprecated Use requireAccessRole('ADMIN') or requirePermission instead */
 export async function requireAdmin(
   request: FastifyRequest,
   _reply: FastifyReply
 ): Promise<void> {
-  if (!request.authUser?.roles.includes("ADMIN")) {
+  if (request.authUser?.accessRole !== "ADMIN") {
     throw new AppError(403, "Admin access required", "FORBIDDEN");
   }
 }

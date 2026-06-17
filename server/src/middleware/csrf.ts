@@ -6,6 +6,7 @@ const CSRF_EXEMPT_PREFIXES = [
   "/api/v1/auth/login",
   "/api/v1/auth/signup",
   "/api/v1/auth/refresh",
+  "/api/v1/auth/logout",
   "/api/v1/auth/forgot-password",
   "/api/v1/auth/reset-password",
   "/api/v1/auth/verify-email",
