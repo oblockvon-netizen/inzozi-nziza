@@ -1,8 +1,26 @@
-# Inzozi Nziza — Migration Plan: Supabase → PostgreSQL + Prisma
+# Inzozi Nziza — Migration Plan: Supabase → Neon PostgreSQL + Prisma
 
 **Date:** 2026-06-17  
-**Status:** Plan only — no code changes yet  
-**Aligned with:** `AGENT.md` phases and target stack
+**Status:** Phase 2 (Prisma schema) complete — schema and ERD created  
+**Target database:** [Neon](https://neon.tech) PostgreSQL  
+**Aligned with:** `AGENT.md`
+
+---
+
+## Progress tracker
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Audit current app | ✅ Done — see `AUDIT.md` |
+| 2 | Create Prisma schema | ✅ Done — `prisma/schema.prisma`, `ERD.md` |
+| 3 | Set up Neon PostgreSQL | ⬜ Next |
+| 4 | Build backend auth | ⬜ Pending |
+| 5 | Build RBAC middleware | ⬜ Pending |
+| 6 | Replace Supabase client calls | ⬜ Pending |
+| 7 | Rebuild UI | ⬜ Pending |
+| 8 | Audit logs + two-admin approval | ⬜ Pending |
+| 9 | Test all roles | ⬜ Pending |
+| 10 | Update README and deployment docs | ⬜ Pending |
 
 ---
 
@@ -10,627 +28,453 @@
 
 | Goal | Success criteria |
 |------|------------------|
-| Remove Supabase dependency | Zero `@supabase/*` imports; no anon key in frontend |
-| Standalone PostgreSQL | Neon or Aiven Free tier; connection string server-only |
-| Prisma ORM | Schema, migrations, typed client |
-| Secure auth | HttpOnly cookies, refresh tokens, bcrypt/argon2 |
-| Server RBAC | All mutations through API with middleware |
-| Fix known bugs | Admin sees all loans; schema complete; README accurate |
+| Remove Supabase | Zero `@supabase/*` imports; no anon key in frontend |
+| Neon PostgreSQL | `DATABASE_URL` server-only; pooled connection for serverless |
+| Prisma ORM | `prisma/schema.prisma` + versioned migrations |
+| Secure auth | HttpOnly cookies, `refresh_tokens` table, argon2/bcrypt |
+| Server RBAC | All mutations through API middleware |
+| Schema parity | All preserved tables + new governance tables |
 | Production readiness | Audit logs, two-admin approval, rate limiting |
 
 ---
 
-## 2. Target Architecture
+## 2. Target architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Frontend (keep Vite + React initially)                          │
-│  • React Router                                                  │
-│  • TanStack Query → API client                                   │
-│  • shadcn/ui + Framer Motion (UI refresh in Phase 7)             │
-│  • pdf-lib OR server PDF endpoint                                │
+│  Frontend (Vite + React — existing)                              │
+│  • React Router + TanStack Query                                 │
+│  • API client → credentials: 'include'                           │
 └────────────────────────────┬─────────────────────────────────────┘
-                             │ REST /api/v1/*
-                             │ credentials: 'include' (cookies)
+                             │ HTTPS /api/v1/*
                              ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  Backend (new: recommend Fastify or Express in /server)          │
-│  • Auth routes (login, signup, refresh, logout, reset)           │
-│  • Member routes (profile, contributions RO, loans, fines RO)    │
-│  • Admin routes (users, contributions, loans, fines, reports)    │
-│  • Middleware: auth, rbac, rateLimit, csrf, validate(zod)       │
-│  • Services: loanService, contributionService, fineService, etc. │
+│  Backend (/server — to be created)                               │
+│  • Fastify or Express                                            │
+│  • Auth, RBAC, Zod validation, rate limiting, CSRF                 │
+│  • Prisma Client                                                 │
 └────────────────────────────┬─────────────────────────────────────┘
-                             │ Prisma Client
+                             │ DATABASE_URL (pooled)
                              ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  PostgreSQL (Neon / Aiven)                                       │
-│  • Prisma migrations                                             │
-│  • No RLS required (app-layer auth); optional DB constraints     │
+│  Neon PostgreSQL                                                 │
+│  • prisma migrate deploy                                         │
+│  • Optional: Neon branching for preview environments             │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Why not Next.js full migration initially:** Current app is Vite SPA. Adding a separate `/server` package minimizes rewrite risk. Next.js can be evaluated in Phase 7 if SSR/API colocation is desired.
+---
+
+## 3. Prisma schema (created)
+
+**Location:** [`prisma/schema.prisma`](prisma/schema.prisma)  
+**Diagram:** [`ERD.md`](ERD.md)
+
+### Tables
+
+| Table | Origin | Purpose |
+|-------|--------|---------|
+| `users` | Replaces `auth.users` | Credentials, lockout, activity |
+| `profiles` | Preserved | Member info, approval, status |
+| `roles` | New lookup | `ADMIN`, `USER` seed rows |
+| `user_roles` | Preserved | M:N user ↔ role |
+| `contributions` | Preserved | Monthly 105,000 RWF tracking |
+| `loans` | Preserved + extended | Loan lifecycle incl. `DEFAULTED` |
+| `loan_payments` | Preserved + extended | Installments + payments |
+| `fines` | Preserved + extended | Penalties with `amount_paid` |
+| `fine_payments` | **Added** | Was in app code, missing from Supabase migration |
+| `admin_approval_requests` | **Added** | Two-admin workflow |
+| `audit_logs` | **Added** | Admin action trail |
+| `notifications` | **Added** | In-app alerts (replaces polling) |
+| `refresh_tokens` | **Added** | HttpOnly cookie session refresh |
+
+### Design decisions
+
+1. **Separate `users` and `profiles`** — mirrors Supabase split; simplifies data migration (preserve `auth.users.id` → `users.id`).
+2. **`roles` lookup table** — per `AGENT.md`; seed `ADMIN` and `USER` instead of inline enum on `user_roles`.
+3. **`MemberStatus` enum** — `PENDING` / `ACTIVE` / `INACTIVE` replaces boolean-only approval + ad-hoc `status` string.
+4. **`recorded_by_id` / `issued_by_id`** — audit trail on financial writes before `audit_logs` is queried.
+5. **No RLS** — authorization enforced in API layer (Neon has no Supabase Auth integration).
+6. **Snake_case in DB** — `@map` on all columns for PostgreSQL convention.
 
 ---
 
-## 3. Prisma Schema (Target)
+## 4. Neon setup (Phase 3)
 
-Maps current tables + `AGENT.md` requirements. Supabase `auth.users` collapses into `users`.
+### 4.1 Create Neon project
+
+1. Create project at [console.neon.tech](https://console.neon.tech) (or use Neon MCP in Cursor).
+2. Region: choose closest to users (e.g. `aws-eu-central-1` for Rwanda/EU latency).
+3. Create database: `inzozi_nziza`.
+
+### 4.2 Connection strings
+
+Neon provides two URLs — use both:
+
+```env
+# Pooled — use in application runtime (serverless-friendly)
+DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/inzozi_nziza?sslmode=require"
+
+# Direct — use for Prisma migrations only
+DIRECT_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/inzozi_nziza?sslmode=require"
+```
+
+Add to `prisma/schema.prisma` datasource when running migrations:
 
 ```prisma
-// prisma/schema.prisma (planned — not created yet)
-
-enum Role {
-  ADMIN
-  USER
-}
-
-enum MemberStatus {
-  PENDING
-  ACTIVE
-  INACTIVE
-}
-
-enum ContributionStatus {
-  PENDING
-  COMPLETED
-  FAILED
-}
-
-enum LoanStatus {
-  PENDING
-  APPROVED
-  DENIED
-  DISBURSED
-  REPAID
-  DEFAULTED
-}
-
-enum LoanPaymentStatus {
-  PENDING
-  PAID
-  OVERDUE
-}
-
-enum FineStatus {
-  PENDING
-  PAID
-  CANCELLED
-}
-
-enum ApprovalRequestType {
-  GRANT_ADMIN
-  APPROVE_MEMBER
-  APPROVE_LOAN
-  DENY_LOAN
-  DELETE_USER
-  DEACTIVATE_USER
-  CONTRIBUTION_CORRECTION
-  CANCEL_FINE
-}
-
-enum ApprovalRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  EXPIRED
-}
-
-model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  passwordHash  String
-  emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastActiveAt  DateTime?
-
-  profile       Profile?
-  roles         UserRole[]
-  contributions Contribution[]
-  loans         Loan[]
-  fines         Fine[]
-  sessions      RefreshToken[]
-  auditLogs     AuditLog[]     @relation("AuditActor")
-  notifications Notification[]
-  approvalRequestsCreated  AdminApprovalRequest[] @relation("Requester")
-  approvalRequestsReviewed AdminApprovalRequest[] @relation("Reviewer")
-}
-
-model Role {
-  id   String @id @default(uuid())
-  name Role   @unique // maps to enum — or use enum directly on UserRole
-}
-
-model UserRole {
-  id        String   @id @default(uuid())
-  userId    String
-  role      Role
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@unique([userId, role])
-}
-
-model Profile {
-  id          String       @id @default(uuid())
-  userId      String       @unique
-  fullName    String
-  phone       String?
-  isApproved  Boolean      @default(false)
-  status      MemberStatus @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Contribution {
-  id              String             @id @default(uuid())
-  userId          String
-  amount          Decimal            @db.Decimal(12, 2)
-  paymentDate     DateTime
-  status          ContributionStatus @default(PENDING)
-  referenceNumber String?
-  recordedById    String?            // admin who recorded
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Loan {
-  id                String     @id @default(uuid())
-  userId            String
-  amount            Decimal    @db.Decimal(12, 2)
-  purpose           String
-  status            LoanStatus @default(PENDING)
-  appliedAt         DateTime   @default(now())
-  approvedAt        DateTime?
-  adminNotes        String?
-  dueDate           DateTime?
-  interestRate      Decimal?   @db.Decimal(5, 2)
-  totalWithInterest Decimal?   @db.Decimal(12, 2)
-  amountPaid        Decimal    @default(0) @db.Decimal(12, 2)
-  lastPaymentDate   DateTime?
-  installmentsCount Int        @default(3)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments          LoanPayment[]
-}
-
-model LoanPayment {
-  id                 String            @id @default(uuid())
-  loanId             String
-  amount             Decimal           @db.Decimal(12, 2)
-  dueDate            DateTime
-  paidAmount         Decimal           @default(0) @db.Decimal(12, 2)
-  paidDate           DateTime?
-  status             LoanPaymentStatus @default(PENDING)
-  installmentNumber  Int?
-  notes              String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  loan               Loan              @relation(fields: [loanId], references: [id], onDelete: Cascade)
-}
-
-model Fine {
-  id         String     @id @default(uuid())
-  userId     String
-  amount     Decimal    @db.Decimal(12, 2)
-  amountPaid Decimal    @default(0) @db.Decimal(12, 2)
-  reason     String
-  status     FineStatus @default(PENDING)
-  issuedAt   DateTime   @default(now())
-  paidAt     DateTime?
-  adminNotes String?
-  issuedById String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments   FinePayment[]
-}
-
-model FinePayment {
-  id        String   @id @default(uuid())
-  fineId    String
-  amount    Decimal  @db.Decimal(12, 2)
-  paidAt    DateTime @default(now())
-  recordedById String?
-  fine      Fine     @relation(fields: [fineId], references: [id], onDelete: Cascade)
-}
-
-model AdminApprovalRequest {
-  id            String                @id @default(uuid())
-  type          ApprovalRequestType
-  status        ApprovalRequestStatus @default(PENDING)
-  requesterId   String
-  reviewerId    String?
-  targetUserId  String?
-  targetLoanId  String?
-  targetFineId  String?
-  payload       Json                  // amounts, notes, etc.
-  createdAt     DateTime              @default(now())
-  resolvedAt    DateTime?
-  requester     User                  @relation("Requester", fields: [requesterId], references: [id])
-  reviewer      User?                 @relation("Reviewer", fields: [reviewerId], references: [id])
-}
-
-model AuditLog {
-  id         String   @id @default(uuid())
-  actorId    String?
-  action     String
-  entityType String
-  entityId   String?
-  metadata   Json?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
-  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  title     String
-  body      String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  tokenHash String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 ```
 
-### Schema mapping: Supabase → Prisma
+### 4.3 Install Prisma (root or `/server`)
 
-| Supabase (current) | Prisma (target) | Notes |
-|--------------------|-----------------|-------|
-| `auth.users` | `User` | Add `passwordHash`; migrate emails |
-| `profiles` | `Profile` | Add `status` enum; merge `is_approved` |
-| `user_roles` | `UserRole` | Keep `admin`/`user` |
-| `contributions` | `Contribution` | Add `recordedById` |
-| `loans` | `Loan` | Add `DEFAULTED` to enum |
-| `loan_payments` | `LoanPayment` | Add `installmentNumber` |
-| `fines` | `Fine` | Add `amountPaid` |
-| — | `FinePayment` | **New** (exists in code, missing in migration) |
-| — | `AdminApprovalRequest` | **New** per AGENT.md |
-| — | `AuditLog` | **New** |
-| — | `Notification` | **New** (replace polling) |
-| — | `RefreshToken` | **New** for cookie auth |
+```bash
+npm install prisma @prisma/client --save-dev
+npm install @prisma/client
+```
+
+Add to root `package.json`:
+
+```json
+{
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
+```
+
+### 4.4 First migration
+
+```bash
+# After DATABASE_URL and DIRECT_URL are set in .env
+npx prisma migrate dev --name init
+npx prisma generate
+```
+
+### 4.5 Seed script (`prisma/seed.ts` — to create in Phase 3)
+
+```typescript
+// Pseudocode — implement in Phase 3
+await prisma.role.createMany({
+  data: [{ name: 'ADMIN' }, { name: 'USER' }],
+  skipDuplicates: true,
+});
+
+// Create initial admin from env — never from public signup
+const adminRole = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
+const passwordHash = await hash(process.env.INITIAL_ADMIN_PASSWORD!);
+const admin = await prisma.user.create({
+  data: {
+    email: process.env.INITIAL_ADMIN_EMAIL!,
+    passwordHash,
+    emailVerifiedAt: new Date(),
+    profile: { create: { fullName: 'System Admin', isApproved: true, status: 'ACTIVE' } },
+    userRoles: { create: { roleId: adminRole!.id } },
+  },
+});
+```
+
+### 4.6 Neon branching (optional)
+
+| Branch | Use |
+|--------|-----|
+| `main` | Production |
+| `dev` | Local development |
+| `preview/pr-*` | CI preview per PR |
+
+Each branch gets its own `DATABASE_URL` — ideal for safe migration testing.
 
 ---
 
-## 4. API Design (Planned)
+## 5. Data migration from Supabase (Phase 9)
+
+Only required if production Supabase data exists.
+
+### 5.1 Export order (respect FKs)
+
+```
+roles (seed first)
+  ↓
+users  ← auth.users
+  ↓
+profiles, user_roles, refresh_tokens (empty initially)
+  ↓
+contributions, loans, fines
+  ↓
+loan_payments, fine_payments
+  ↓
+notifications, audit_logs, admin_approval_requests (empty initially)
+```
+
+### 5.2 Field mapping
+
+| Supabase | Prisma | Transform |
+|----------|--------|-----------|
+| `auth.users.id` | `users.id` | Keep UUID |
+| `auth.users.email` | `users.email` | Lowercase trim |
+| `auth.users.encrypted_password` | `users.password_hash` | Verify bcrypt compat or force reset |
+| `profiles.is_approved = false` | `profiles.status = PENDING` | |
+| `profiles.is_approved = true` | `profiles.status = ACTIVE` | |
+| `user_roles.role = 'admin'` | `user_roles` → `roles.name = ADMIN` | Lookup role ID |
+| `user_roles.role = 'user'` | `user_roles` → `roles.name = USER` | Lookup role ID |
+| `loans.status = 'defaulted'` | `loans.status = DEFAULTED` | Uppercase enum |
+| `contributions.status` | `ContributionStatus` | Uppercase enum |
+| `fines` (no `amount_paid`) | `fines.amount_paid` | Compute from `fine_payments` sum or 0 |
+
+### 5.3 Validation queries (post-import)
+
+```sql
+-- User count match
+SELECT COUNT(*) FROM users;
+
+-- Contribution totals reconcile
+SELECT SUM(amount) FROM contributions WHERE status = 'COMPLETED';
+
+-- No orphan loan payments
+SELECT COUNT(*) FROM loan_payments lp
+LEFT JOIN loans l ON l.id = lp.loan_id WHERE l.id IS NULL;
+```
+
+### 5.4 Cutover checklist
+
+- [ ] Put Supabase project in read-only mode
+- [ ] Run final export
+- [ ] Import to Neon
+- [ ] Run validation queries
+- [ ] Deploy new API + frontend
+- [ ] Smoke test login, dashboard, admin
+- [ ] Revoke Supabase anon key after 7-day rollback window
+
+---
+
+## 6. Backend API plan (Phases 4–6)
 
 Base path: `/api/v1`
 
-### Auth
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/auth/signup` | Public | Member signup only (no role param) |
-| POST | `/auth/login` | Public | Returns cookies |
-| POST | `/auth/logout` | User | Clears cookies |
-| POST | `/auth/refresh` | Refresh cookie | Rotate access token |
-| POST | `/auth/forgot-password` | Public | Send reset email |
-| POST | `/auth/reset-password` | Token | Set new password |
-
-### Member (requires `ACTIVE` profile)
+### Auth (Phase 4)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/me` | Profile + roles + approval status |
-| PATCH | `/me/profile` | Update name, phone |
-| PATCH | `/me/password` | Change password (verify current) |
-| GET | `/me/contributions` | List own contributions |
-| GET | `/me/contributions/summary` | Monthly 105k progress |
-| GET | `/me/loans` | List own loans + payments |
-| POST | `/me/loans` | Apply for loan |
-| GET | `/me/fines` | List own fines |
-| GET | `/me/report.pdf` | Member PDF report |
-| GET | `/me/notifications` | List notifications |
+| POST | `/auth/signup` | Member only — no role param |
+| POST | `/auth/login` | Sets HttpOnly cookies |
+| POST | `/auth/logout` | Revokes refresh token |
+| POST | `/auth/refresh` | Rotates access token |
+| POST | `/auth/forgot-password` | Email reset link |
+| POST | `/auth/reset-password` | Token-based reset |
 
-### Admin (requires `ADMIN` role)
+### Member (Phase 5–6) — requires `ACTIVE` profile
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/admin/users` | All users + stats |
-| POST | `/admin/users/:id/approve` | Approve member (or create approval request) |
-| POST | `/admin/users/:id/deactivate` | Deactivate (two-admin) |
-| POST | `/admin/contributions` | Record contribution |
-| PATCH | `/admin/contributions/:id` | Correction (two-admin) |
-| GET | `/admin/loans` | **All** loans (fixes BUG-01) |
-| POST | `/admin/loans/:id/approve` | Approve (two-admin) |
-| POST | `/admin/loans/:id/deny` | Deny |
-| POST | `/admin/loans/:id/payments` | Record payment |
-| GET | `/admin/fines` | All fines |
-| POST | `/admin/fines` | Issue fine |
-| POST | `/admin/fines/:id/payments` | Record fine payment |
-| POST | `/admin/fines/:id/cancel` | Cancel (two-admin) |
-| GET | `/admin/report.pdf` | Admin PDF report |
-| GET | `/admin/approval-requests` | Pending second approvals |
-| POST | `/admin/approval-requests/:id/resolve` | Approve/reject request |
+| Method | Path | Prisma models |
+|--------|------|---------------|
+| GET | `/me` | `User`, `Profile`, `UserRole` |
+| PATCH | `/me/profile` | `Profile` |
+| GET | `/me/contributions` | `Contribution` |
+| GET | `/me/contributions/summary` | `Contribution` (monthly agg) |
+| GET | `/me/loans` | `Loan`, `LoanPayment` |
+| POST | `/me/loans` | `Loan` |
+| GET | `/me/fines` | `Fine`, `FinePayment` |
+| GET | `/me/notifications` | `Notification` |
+| GET | `/me/report.pdf` | Multiple |
 
-### Background jobs (cron or node-cron)
+### Admin (Phase 5–6) — requires `ADMIN` role
 
-| Job | Schedule | Logic |
-|-----|----------|-------|
-| `checkOverdueLoans` | Daily | Mark overdue installments; optional DEFAULTED flow |
-| `checkInactiveMembers` | Daily | 3-month inactivity deactivation (if product confirms) |
-| `cleanupRefreshTokens` | Daily | Delete expired tokens |
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/admin/users` | All profiles + stats |
+| POST | `/admin/users/:id/approve` | Creates `AdminApprovalRequest` or direct if config allows |
+| GET | `/admin/loans` | **All loans** — fixes BUG-01 |
+| POST | `/admin/loans/:id/approve` | Two-admin via `AdminApprovalRequest` |
+| POST | `/admin/contributions` | `Contribution` + `AuditLog` |
+| POST | `/admin/fines` | `Fine` + `Notification` |
+| GET | `/admin/approval-requests` | Pending inbox |
+| POST | `/admin/approval-requests/:id/resolve` | Second admin acts |
+
+Every mutating admin route writes to `audit_logs`.
 
 ---
 
-## 5. Migration Phases
+## 7. Two-admin approval flow (Phase 8)
 
-### Phase 0 — Preparation (1–2 days)
+Sensitive actions per `AGENT.md` create a `AdminApprovalRequest` instead of executing immediately:
 
-- [ ] Confirm Neon or Aiven PostgreSQL project
-- [ ] Rotate/revoke exposed Supabase keys
-- [ ] Export existing Supabase data (if production data exists)
-- [ ] Freeze feature development on Supabase paths
-- [ ] Add `server/` package to monorepo (or `apps/api`)
+```
+Admin A → POST /admin/loans/:id/approve
+       → INSERT admin_approval_requests (status: PENDING)
+       → INSERT notifications (all other admins)
+       → INSERT audit_logs (action: LOAN_APPROVAL_REQUESTED)
 
-**Deliverables:** Empty PostgreSQL instance, env template, data export scripts
+Admin B → POST /admin/approval-requests/:id/resolve { decision: APPROVED }
+       → UPDATE loan, create loan_payments, etc.
+       → UPDATE admin_approval_requests (status: APPROVED)
+       → INSERT notifications (member + Admin A)
+       → INSERT audit_logs (action: LOAN_APPROVED)
+```
 
----
-
-### Phase 1 — Prisma foundation (2–3 days)
-
-- [ ] Initialize Prisma in `server/prisma/`
-- [ ] Implement schema from Section 3
-- [ ] `prisma migrate dev` — initial migration
-- [ ] Seed script: first admin user (env-based), no public admin signup
-- [ ] Prisma client singleton + connection pooling (Neon serverless driver if needed)
-
-**Deliverables:** `schema.prisma`, initial migration SQL, seed script
-
----
-
-### Phase 2 — Auth system (3–5 days)
-
-- [ ] Password hashing (argon2id preferred)
-- [ ] Access JWT (short-lived, 15m) + refresh token (7d, hashed in DB)
-- [ ] HttpOnly, Secure, SameSite cookies
-- [ ] Auth middleware: `requireAuth`, `requireApproved`, `requireAdmin`
-- [ ] Rate limiting on `/auth/*`
-- [ ] Account lockout after 5 failed logins
-- [ ] Zod schemas for all auth inputs
-- [ ] CSRF token issuance for cookie auth
-
-**Deliverables:** Working login/signup/logout/refresh without Supabase
+| `ApprovalRequestType` | Trigger |
+|-----------------------|---------|
+| `GRANT_ADMIN` | Promote user to admin |
+| `APPROVE_MEMBER` | Activate pending member |
+| `APPROVE_LOAN` | Approve loan application |
+| `DENY_LOAN` | Deny loan application |
+| `DELETE_USER` | Remove member |
+| `DEACTIVATE_USER` | Set `profiles.status = INACTIVE` |
+| `CONTRIBUTION_CORRECTION` | Adjust recorded contribution |
+| `CANCEL_FINE` | Cancel outstanding fine |
 
 ---
 
-### Phase 3 — Core API — read paths (3–4 days)
+## 8. Frontend migration (Phase 6)
 
-- [ ] `GET /me`, contributions, loans, fines endpoints
-- [ ] Port business logic from `Dashboard.tsx` into services
-- [ ] Monthly contribution summary service (105,000 RWF rule)
-- [ ] Fix admin loans list to return **all** loans with borrower info
+### Replace Supabase imports
 
-**Deliverables:** Member read API; integration tests for RBAC
+| File | Replace with |
+|------|--------------|
+| `src/pages/Auth.tsx` | `POST /auth/login`, `/auth/signup` |
+| `src/pages/Dashboard.tsx` | `GET /me/*` hooks |
+| `src/pages/AdminDashboard.tsx` | `GET/POST /admin/*` hooks |
+| `src/pages/Profile.tsx` | `PATCH /me/profile`, `/me/password` |
+| `src/components/FinesManagement.tsx` | `/admin/fines/*` |
+| `src/components/UserFines.tsx` | `GET /me/fines` |
+| `src/integrations/supabase/*` | **Delete** |
 
----
+### New files to create
 
-### Phase 4 — Core API — write paths (4–6 days)
-
-- [ ] Loan application (member)
-- [ ] Admin: approve/deny loan with installment generation (port `calculateLoanDetails`)
-- [ ] Admin: record loan payments (update schedule + loan totals)
-- [ ] Admin: record contributions
-- [ ] Admin: approve members
-- [ ] Fines: issue, pay, cancel (port `FinesManagement` logic)
-- [ ] Audit log on every mutation
-
-**Deliverables:** Feature parity with current app (minus intentional gaps)
-
----
-
-### Phase 5 — Two-admin approval + notifications (3–4 days)
-
-- [ ] `AdminApprovalRequest` workflow for sensitive actions per `AGENT.md`
-- [ ] First admin creates request; second admin resolves
-- [ ] `Notification` records on approval events
-- [ ] Replace 5s fines polling with `GET /me/notifications` + optional SSE later
-
-**Deliverables:** Dual-approval for loans, deactivation, fine cancel, admin grant
+```
+src/lib/api.ts           # fetch wrapper, CSRF header
+src/hooks/useAuth.ts     # session from /me
+src/hooks/useContributions.ts
+src/hooks/useLoans.ts
+src/hooks/useFines.ts
+src/hooks/useNotifications.ts
+```
 
 ---
 
-### Phase 6 — Frontend API integration (4–6 days)
-
-- [ ] Create `src/lib/api.ts` fetch wrapper (`credentials: 'include'`)
-- [ ] Replace all `supabase.from()` calls with API hooks (TanStack Query)
-- [ ] Replace `supabase.auth.*` with auth API
-- [ ] Update `Auth.tsx` — remove role selection, admin key
-- [ ] Update route guards to use `/me` endpoint
-- [ ] Remove `src/integrations/supabase/` directory
-- [ ] Remove `@supabase/supabase-js` dependency
-
-**Deliverables:** Frontend fully on new API
-
----
-
-### Phase 7 — UI refresh (5–8 days, parallelizable)
-
-- [ ] Framer Motion page transitions
-- [ ] Dashboard redesign per `AGENT.md` UI direction
-- [ ] Link Profile from header
-- [ ] Admin tables polish
-- [ ] Mobile-first pass
-
-**Deliverables:** Modern UI matching target design
-
----
-
-### Phase 8 — Reports, jobs, hardening (3–4 days)
-
-- [ ] Server-side PDF generation (optional; or keep pdf-lib with API-gated data)
-- [ ] Cron: overdue loans, inactivity (if required)
-- [ ] Security headers in deployment config
-- [ ] E2E tests: member, pending, admin, two-admin flows
-
-**Deliverables:** Production-ready deployment
-
----
-
-### Phase 9 — Data migration (1–2 days, if existing data)
-
-**Only if Supabase production has real users:**
-
-1. Export `auth.users` → transform to `User` + `passwordHash`  
-   - **Note:** Supabase password hashes may be bcrypt — verify compatibility or force password reset
-2. Export `profiles`, `user_roles`, `contributions`, `loans`, `loan_payments`, `fines`, `fine_payments`
-3. Map `auth.users.id` → `User.id` (preserve UUIDs for FK integrity)
-4. Validate counts and spot-check financial totals
-5. Cutover: DNS/deploy new stack; read-only window on Supabase
-
-**If no production data:** Seed only; skip export.
-
----
-
-### Phase 10 — Decommission Supabase (1 day)
-
-- [ ] Remove `supabase/` directory from repo (or archive)
-- [ ] Update `README.md` to match implementation
-- [ ] Update deployment docs (Vercel frontend + API host e.g. Railway/Fly/Render)
-- [ ] Delete Supabase project after verification period
-
----
-
-## 6. Repository Structure (Proposed)
+## 9. Repository structure
 
 ```
 inzozi-nziza/
-├── src/                    # Vite React frontend (existing)
-│   ├── lib/api.ts          # NEW — API client
-│   ├── hooks/              # useAuth, useContributions, etc.
-│   └── pages/              # Updated to use hooks
-├── server/                 # NEW
-│   ├── src/
-│   │   ├── index.ts
-│   │   ├── routes/
-│   │   ├── middleware/
-│   │   ├── services/
-│   │   └── utils/
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── migrations/
-│   ├── package.json
-│   └── tsconfig.json
-├── package.json            # Workspace root (optional npm workspaces)
+├── prisma/
+│   ├── schema.prisma      ✅ Created
+│   ├── seed.ts            ⬜ Phase 3
+│   └── migrations/        ⬜ Phase 3 (after neon migrate dev)
+├── server/                ⬜ Phase 4
+│   └── src/
+├── src/                   # Existing frontend
+├── ERD.md                 ✅ Created
 ├── AUDIT.md
-├── MIGRATION_PLAN.md
 ├── SECURITY_ISSUES.md
-├── AGENT.md
-└── README.md
+├── MIGRATION_PLAN.md      ✅ This file
+└── AGENT.md
 ```
 
 ---
 
-## 7. Environment Variables
+## 10. Environment variables
 
-### Server (never expose to client)
+### Server / Prisma (`.env` — never commit)
 
 ```env
-DATABASE_URL=postgresql://...
-JWT_ACCESS_SECRET=...
-JWT_REFRESH_SECRET=...
-COOKIE_SECRET=...
-CSRF_SECRET=...
-SMTP_HOST=...
-SMTP_USER=...
-SMTP_PASS=...
-APP_URL=https://inzozi.example.com
-API_URL=https://api.inzozi.example.com
-INITIAL_ADMIN_EMAIL=...
-INITIAL_ADMIN_PASSWORD=...  # seed only, change on first login
+# Neon
+DATABASE_URL=postgresql://...@ep-xxx-pooler.../inzozi_nziza?sslmode=require
+DIRECT_URL=postgresql://...@ep-xxx.../inzozi_nziza?sslmode=require
+
+# Auth
+JWT_ACCESS_SECRET=
+JWT_REFRESH_SECRET=
+COOKIE_SECRET=
+CSRF_SECRET=
+
+# Seed (one-time)
+INITIAL_ADMIN_EMAIL=admin@inzozi.rw
+INITIAL_ADMIN_PASSWORD=
+
+# App
+APP_URL=http://localhost:8080
+API_URL=http://localhost:3000
+NODE_ENV=development
 ```
 
-### Frontend
+### Frontend (`.env`)
 
 ```env
-VITE_API_URL=https://api.inzozi.example.com
+VITE_API_URL=http://localhost:3000
 ```
 
 ---
 
-## 8. Supabase Removal Checklist
+## 11. Supabase removal checklist
 
-| Item | Phase |
+| Step | Phase |
 |------|-------|
-| Remove `src/integrations/supabase/client.ts` | 6 |
-| Remove `src/integrations/supabase/types.ts` | 6 |
-| Remove `@supabase/supabase-js` from package.json | 6 |
-| Remove Supabase auth from all pages | 6 |
-| Remove `supabase/` config and migrations (after Prisma parity) | 10 |
-| Rotate/delete Supabase project keys | 0, 10 |
+| All API routes implemented | 4–6 |
+| Frontend uses API only | 6 |
+| Delete `src/integrations/supabase/` | 6 |
+| Remove `@supabase/supabase-js` from `package.json` | 6 |
+| Archive `supabase/migrations/` | 10 |
+| Rotate + delete Supabase project | 10 |
 
 ---
 
-## 9. Risk Register
+## 12. Risk register
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Password hash incompatibility from Supabase export | Medium | High | Force password reset email on migration |
-| Schema drift on live Supabase vs repo migration | High | High | Export live schema before data migration |
-| Financial data corruption during migration | Low | Critical | Transactional import; reconciliation report |
-| Extended downtime during cutover | Medium | Medium | Blue/green deploy; migrate read-only window |
-| Scope creep in UI refresh | High | Medium | Phase 7 optional for MVP; ship API first |
-
----
-
-## 10. Definition of Done
-
-Migration is complete when:
-
-1. No Supabase packages or credentials in the repository
-2. All CRUD operations go through authenticated API routes
-3. `SECURITY_ISSUES.md` Critical and High items are resolved
-4. Admin can view and manage **all** member loans
-5. `fine_payments` and full fines model exist in Prisma migrations
-6. Two-admin approval works for loan approval and member deactivation
-7. Audit logs capture admin financial actions
-8. README accurately describes stack and features
-9. E2E tests pass for member, pending, and admin roles
-10. Production deployed with HTTPS, secure cookies, rate limiting
+| Risk | Mitigation |
+|------|------------|
+| Password hashes incompatible | Test bcrypt import; fallback to forced reset |
+| Live Supabase schema differs from repo migration | Export `pg_dump --schema-only` before data migration |
+| Neon cold starts | Use pooled `DATABASE_URL`; keep-alive ping in API |
+| Prisma migrate on Neon production | Use `migrate deploy` in CI, never `migrate dev` |
 
 ---
 
-## 11. Estimated Timeline
+## 13. Timeline (updated)
 
 | Phase | Duration | Cumulative |
 |-------|----------|------------|
-| 0 Preparation | 1–2 days | ~2 days |
-| 1 Prisma | 2–3 days | ~5 days |
-| 2 Auth | 3–5 days | ~10 days |
-| 3 Read API | 3–4 days | ~14 days |
-| 4 Write API | 4–6 days | ~20 days |
-| 5 Two-admin + notifications | 3–4 days | ~24 days |
-| 6 Frontend integration | 4–6 days | ~30 days |
-| 7 UI refresh | 5–8 days | ~38 days |
-| 8 Hardening | 3–4 days | ~42 days |
-| 9 Data migration | 1–2 days | ~44 days |
-| 10 Decommission | 1 day | ~45 days |
+| 1 Audit | Done | — |
+| 2 Prisma schema | Done | — |
+| 3 Neon + first migration | 1–2 days | ~2 days |
+| 4 Auth API | 3–5 days | ~7 days |
+| 5 RBAC + read/write API | 5–8 days | ~15 days |
+| 6 Frontend integration | 4–6 days | ~21 days |
+| 7 UI refresh | 5–8 days | ~29 days |
+| 8 Two-admin + notifications | 3–4 days | ~33 days |
+| 9 Data migration (if needed) | 1–2 days | ~35 days |
+| 10 Decommission Supabase | 1 day | ~36 days |
 
-**MVP (phases 0–6, skip UI refresh):** ~4–5 weeks  
-**Full rebuild (all phases):** ~6–9 weeks
+**MVP (Phases 3–6):** ~3 weeks from today
 
 ---
 
-## 12. Immediate Next Steps (Awaiting Approval)
+## 14. Immediate next steps
 
-1. **Review** this plan and `SECURITY_ISSUES.md` — confirm two-admin scope and inactivity rule
-2. **Choose** API framework (Fastify recommended for performance + Zod integration)
-3. **Choose** PostgreSQL host (Neon MCP available in workspace)
-4. **Approve** Phase 0 start: scaffold `server/`, Prisma, env template
-5. **Do not** deploy current Supabase build to production until SEC-001/002/003 remediated
+1. **Phase 3** — Create Neon project and add `DATABASE_URL` / `DIRECT_URL` to `.env`
+2. Add `directUrl` to `prisma/schema.prisma` datasource
+3. Run `npx prisma migrate dev --name init`
+4. Create `prisma/seed.ts` with roles + initial admin
+5. **Phase 4** — Scaffold `/server` with auth routes using `RefreshToken` model
 
-No files have been modified except these three planning documents.
+---
+
+## 15. Definition of done
+
+Migration is complete when:
+
+- [ ] `prisma migrate deploy` succeeds on Neon production
+- [ ] All 14 tables populated correctly (seed + optional Supabase import)
+- [ ] No Supabase packages in `package.json`
+- [ ] `SECURITY_ISSUES.md` Critical/High items resolved
+- [ ] Two-admin approval works for loan approval and member deactivation
+- [ ] `audit_logs` captures every admin mutation
+- [ ] `notifications` replace fines polling
+- [ ] README matches implementation
