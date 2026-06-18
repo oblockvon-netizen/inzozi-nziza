@@ -200,37 +200,50 @@ Frontend runs at **http://localhost:8080** and talks to the API via cookie auth 
 
 ## Create your first admin user
 
-The API does **not** allow self-service admin signup. Promote a user manually after they register.
+### Recommended — bootstrap admin via seed (no manual DB edits)
 
-### Option A — Register via API, then promote in the database
+After migrations, add these to `server/.env` (or root `.env`):
 
-**1. Get a CSRF token and sign up:**
-
-```bash
-curl -c cookies.txt http://localhost:3000/api/v1/auth/csrf
-
-# Copy csrfToken from response, then:
-curl -b cookies.txt -c cookies.txt \
-  -H "Content-Type: application/json" \
-  -H "X-CSRF-Token: YOUR_CSRF_TOKEN" \
-  -d '{"email":"admin@example.com","password":"SecurePass1","fullName":"Admin User","phone":"+250788000000"}' \
-  http://localhost:3000/api/v1/auth/signup
+```env
+BOOTSTRAP_ADMIN_EMAIL=admin@inzozi.local
+BOOTSTRAP_ADMIN_PASSWORD=AdminPass123!
+BOOTSTRAP_ADMIN_NAME=Site Admin
 ```
 
-**2. Open Prisma Studio:**
+Then run:
+
+```bash
+npm run db:seed
+```
+
+Sign in at **http://localhost:8080/auth/login** with that email and password. You are routed to **`/admin`** automatically.
+
+Re-running seed is safe: it upgrades an existing user to admin if the email already exists.
+
+---
+
+### Manual promotion (alternative)
+
+The API does **not** allow self-service admin signup. You can still promote any registered user in the database.
+
+#### Option A — Register via UI, then promote in Prisma Studio
+
+**1.** Sign up at `/auth/signup`.
+
+**2.** Open Prisma Studio:
 
 ```bash
 cd server
 npx prisma studio --schema ../prisma/schema.prisma
 ```
 
-**3. In the database:**
+**3.** In the database:
 
 - Find the user in `users` and note their `id`.
 - In `user_roles`, add a row linking that `user_id` to the `ADMIN` role id (from `roles` table).
 - In `profiles`, set `is_approved = true` and `status = ACTIVE` for that user.
 
-### Option B — Use Neon SQL editor
+#### Option B — Use Neon SQL editor
 
 After signup, run SQL in the Neon console (replace `USER_UUID`):
 
@@ -240,6 +253,16 @@ SELECT gen_random_uuid(), 'USER_UUID', id FROM roles WHERE name = 'ADMIN';
 
 UPDATE profiles SET is_approved = true, status = 'ACTIVE' WHERE user_id = 'USER_UUID';
 ```
+
+---
+
+### Troubleshooting signup / auth errors
+
+| Console error | Cause | Fix |
+|---------------|-------|-----|
+| `500` on `/api/v1/auth/signup` | Database tables missing | Run `npm run db:migrate` then `npm run db:seed` |
+| `401` on `/api/v1/auth/me` and `/refresh` | Not logged in yet (normal on first visit) | Ignore, or sign in after seed |
+| `USER role is not configured` | Roles not seeded | Run `npm run db:seed` |
 
 ---
 
