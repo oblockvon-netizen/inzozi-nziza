@@ -1,92 +1,52 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { AppShell } from "@/components/layout/AppShell";
+import { useAuth } from "@/contexts/AuthContext";
+import { authApi, meApi, ApiError } from "@/lib/api";
 import { User } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
+  const { user, loading: authLoading, setUser } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [profile, setProfile] = useState<{
-    full_name: string;
-    phone: string;
-  }>({ full_name: "", phone: "" });
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
 
   useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name, phone")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setProfile(data);
-      }
-    } catch (error) {
-      console.error("Error loading profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load profile data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    if (!authLoading && !user) {
+      navigate("/auth", { replace: true });
+      return;
     }
-  };
+    if (user) {
+      setFullName(user.fullName);
+      setPhone(user.phone ?? "");
+    }
+  }, [authLoading, user, navigate]);
 
   const updateProfile = async () => {
     setUpdating(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profile.full_name,
-          phone: profile.phone,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
+      const { user: updated } = await meApi.updateProfile({
+        fullName,
+        phone: phone || undefined,
       });
+      setUser(updated);
+      toast({ title: "Success", description: "Profile updated successfully" });
     } catch (error) {
-      console.error("Error updating profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive",
-      });
+      const message = error instanceof ApiError ? error.message : "Update failed";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setUpdating(false);
     }
@@ -104,112 +64,114 @@ export default function Profile() {
 
     setUpdating(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
+      await authApi.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
       });
-
-      if (error) throw error;
-
       toast({
         title: "Success",
-        description: "Password updated successfully",
+        description: "Password changed. Please sign in again.",
       });
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      navigate("/auth", { replace: true });
     } catch (error) {
-      console.error("Error updating password:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update password",
-        variant: "destructive",
-      });
+      const message = error instanceof ApiError ? error.message : "Update failed";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setUpdating(false);
     }
   };
 
-  if (loading) {
+  if (authLoading || !user) {
     return <LoadingSpinner />;
   }
 
   return (
     <AppShell title="Profile settings" subtitle="Manage your account information">
       <div className="mx-auto max-w-2xl space-y-6">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="rounded-full bg-accent/10 p-3">
-                <User className="h-8 w-8 text-accent" />
-              </div>
+        <div className="mb-8 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="rounded-full bg-accent/10 p-3">
+              <User className="h-8 w-8 text-accent" />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">Your profile</h2>
-            <p className="text-muted-foreground">Update personal details and password</p>
           </div>
-
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>
-                Update your personal details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={profile.full_name}
-                  onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                  placeholder="Enter your full name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={profile.phone || ""}
-                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  placeholder="Enter your phone number"
-                />
-              </div>
-              <Button onClick={updateProfile} disabled={updating} className="w-full">
-                {updating ? "Updating..." : "Update Profile"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-              <CardDescription>
-                Update your account password
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  placeholder="Enter new password"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  placeholder="Confirm new password"
-                />
-              </div>
-              <Button onClick={updatePassword} disabled={updating} className="w-full">
-                {updating ? "Updating..." : "Update Password"}
-              </Button>
-            </CardContent>
-          </Card>
+          <h2 className="text-2xl font-semibold tracking-tight">Your profile</h2>
+          <p className="text-muted-foreground">{user.email}</p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal information</CardTitle>
+            <CardDescription>Update your personal details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full name</Label>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <Button onClick={updateProfile} disabled={updating} className="w-full">
+              {updating ? "Updating..." : "Update profile"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Change password</CardTitle>
+            <CardDescription>Update your account password</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current password</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) =>
+                  setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) =>
+                  setPasswordData({ ...passwordData, newPassword: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm new password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) =>
+                  setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+                }
+              />
+            </div>
+            <Button onClick={updatePassword} disabled={updating} className="w-full">
+              {updating ? "Updating..." : "Update password"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </AppShell>
   );
 }

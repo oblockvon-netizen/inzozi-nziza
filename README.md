@@ -6,24 +6,21 @@ Community savings and loans platform for Rwanda — members contribute **105,000
 
 ## Current architecture
 
-The project is mid-migration from Supabase to a secure full-stack setup:
-
 | Layer | Stack | Status |
 |-------|--------|--------|
-| **Frontend** | React 18, Vite, Tailwind, shadcn/ui, Framer Motion | ✅ UI redesigned |
+| **Frontend** | React 18, Vite, Tailwind, shadcn/ui, Framer Motion | ✅ UI + API client |
 | **Backend API** | Fastify, Prisma, JWT + HttpOnly cookies, RBAC | ✅ Built (`server/`) |
 | **Database** | PostgreSQL on [Neon](https://neon.tech) | ⬜ You configure |
-| **Frontend data layer** | Still uses Supabase client | ⚠️ Phase 6 pending |
+| **Frontend data layer** | `src/lib/api.ts` → `/api/v1/*` with CSRF + cookies | ✅ Migrated |
 
 **What works today**
 
-- Run the **frontend** against the legacy Supabase project (quick demo, not production-safe).
+- Run the **frontend** against the Fastify API (cookie auth, CSRF on mutations).
 - Run the **backend API** against Neon with full auth, RBAC, rate limiting, CSRF, and audit logs.
-- Test the API with Postman/curl while the UI migration is in progress.
+- Member dashboard, admin dashboard, contributions, loans, and fines all use the API.
 
-**What is not wired yet**
+**What is not implemented yet**
 
-- The React app does not call `/api/v1/*` yet — it still talks to Supabase directly.
 - Two-admin approval, inactivity auto-removal, and real-time notifications are planned, not implemented.
 
 ---
@@ -50,30 +47,37 @@ inzozi-nziza/
 ├── prisma/
 │   ├── schema.prisma    # Database schema
 │   └── seed.ts          # Seeds ADMIN + USER roles
-├── supabase/            # Legacy migrations (old stack)
-├── AGENT.md             # Rebuild guide for contributors
-├── AUTH_API.md          # Auth endpoint reference (in server/)
-├── RBAC.md              # Roles and permissions
-├── SECURITY_REPORT.md   # Security audit summary
-└── UI_DESIGN.md         # Design system
+├── server/              # Fastify API
+└── README.md
 ```
 
 ---
 
-## Quick start — frontend only (legacy Supabase)
+## Quick start
 
-Use this if you only want to preview the UI with the existing Supabase project.
+Both the API and frontend must be running for the app to work.
 
 ```bash
 git clone https://github.com/ntwali123/inzozi-nziza.git
 cd inzozi-nziza
 npm install
+cd server && npm install && cd ..
+```
+
+Follow **Full setup** below to configure Neon and environment variables, then:
+
+```bash
+# Terminal 1 — API (from server/)
+cd server
+npm run dev
+
+# Terminal 2 — Frontend (from repo root)
 npm run dev
 ```
 
-Open **http://localhost:8080**
+Open **http://localhost:8080**. The Vite dev server proxies `/api` to `http://localhost:3000`.
 
-> **Warning:** The legacy frontend has known security issues (client-side admin key, Supabase anon key in source). Do not use this mode in production. See `SECURITY_ISSUES.md` and `SECURITY_REPORT.md`.
+Optional: copy `.env.example` to `.env` and set `VITE_API_URL` if the API is on a different host (leave empty for the dev proxy).
 
 ---
 
@@ -147,12 +151,14 @@ Copy-Item server\.env .env
 
 ### 4. Initialize the database
 
-From the `server/` directory:
+The Prisma schema lives in `prisma/` at the repo root, so run **`npm install` at the repo root first** (step 1). Then generate the client and migrate:
 
 ```bash
-cd server
+# From repo root
+npm run prisma:generate
 
-# Generate Prisma client
+# Or from server/ (uses the same schema)
+cd server
 npm run prisma:generate
 
 # Create tables (first run creates the initial migration)
@@ -163,11 +169,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-If `prisma generate` fails with a `bun` error, run the local binary directly:
-
-```bash
-npx --yes prisma generate --schema ../prisma/schema.prisma
-```
+Do **not** run bare `prisma generate` in PowerShell — the CLI is not on your PATH. Always use `npm run prisma:generate` or `npx prisma generate --schema prisma/schema.prisma` from the repo root.
 
 ### 5. Start the API
 
@@ -192,9 +194,7 @@ curl http://localhost:3000/health
 npm run dev
 ```
 
-Frontend runs at **http://localhost:8080**
-
-Until Phase 6 is complete, the UI still uses Supabase — the API runs independently for testing.
+Frontend runs at **http://localhost:8080** and talks to the API via cookie auth (`credentials: 'include'`) and CSRF tokens on mutations.
 
 ---
 
@@ -293,7 +293,7 @@ Base URL: `http://localhost:3000`
 - Send cookies: `credentials: 'include'`
 - Mutations require header: `X-CSRF-Token` (must match `inzozi_csrf` cookie)
 
-Full reference: [`server/AUTH_API.md`](server/AUTH_API.md) · [`RBAC.md`](RBAC.md)
+Full reference: API routes under `/api/v1/*` — see `server/src/routes/` and `server/.env.example`.
 
 ---
 
@@ -305,7 +305,7 @@ Full reference: [`server/AUTH_API.md`](server/AUTH_API.md) · [`RBAC.md`](RBAC.m
 | **USER** | Approved member — dashboard, own data, loan applications |
 | **PENDING_USER** | Awaiting approval — limited pending screen only |
 
-Details: [`RBAC.md`](RBAC.md)
+Details: roles are enforced in `server/src/middleware/guards.ts` and `server/src/config/permissions.ts`.
 
 ---
 
@@ -324,24 +324,21 @@ Details: [`RBAC.md`](RBAC.md)
 
 ## Planned / not yet implemented
 
-- Frontend migration off Supabase → API client (`Phase 6`)
 - Two-admin approval for sensitive actions
 - Auto-removal after 3 months inactivity
 - Real-time notifications (WebSockets)
 - Google OAuth login
 
-See [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) for the full roadmap.
-
 ---
 
 ## Production deployment (outline)
 
-1. Complete frontend API migration (Phase 6).
-2. Set `NODE_ENV=production` and HTTPS URLs for `APP_URL` / `API_URL`.
-3. Replace all default JWT and cookie secrets.
-4. Configure SMTP for verification and password-reset emails.
-5. Run `npx prisma migrate deploy` against the production Neon database.
-6. Deploy API (Node host, Railway, Render, etc.) and frontend (Vercel static build).
+1. Set `NODE_ENV=production` and HTTPS URLs for `APP_URL` / `API_URL`.
+2. Replace all default JWT and cookie secrets.
+3. Configure SMTP for verification and password-reset emails.
+4. Run `npx prisma migrate deploy` against the production Neon database.
+5. Deploy API (Node host, Railway, Render, etc.) and frontend (Vercel static build).
+6. Set `VITE_API_URL` to your production API origin when building the frontend.
 
 Frontend build:
 
@@ -362,47 +359,48 @@ Production env validation rejects HTTP URLs and placeholder secrets automaticall
 
 ---
 
-## Documentation index
-
-| Document | Contents |
-|----------|----------|
-| [`AGENT.md`](AGENT.md) | Master rebuild guide |
-| [`AUDIT.md`](AUDIT.md) | Original app audit |
-| [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) | Supabase → Neon migration phases |
-| [`ERD.md`](ERD.md) | Database entity diagram |
-| [`RBAC.md`](RBAC.md) | Authorization rules |
-| [`SECURITY_REPORT.md`](SECURITY_REPORT.md) | Security controls and checklist |
-| [`SECURITY_ISSUES.md`](SECURITY_ISSUES.md) | Legacy Supabase findings |
-| [`UI_DESIGN.md`](UI_DESIGN.md) | Design system |
-| [`COMPONENT_MAP.md`](COMPONENT_MAP.md) | UI component map |
-| [`server/AUTH_API.md`](server/AUTH_API.md) | Auth API reference |
-
----
-
 ## Troubleshooting
+
+### `prisma` is not recognized (PowerShell)
+
+The Prisma CLI is installed locally in `node_modules`, not globally. From the repo root:
+
+```powershell
+npm run prisma:generate
+```
+
+Or from `server/`:
+
+```powershell
+cd server
+npm run prisma:generate
+```
 
 ### `prisma generate` fails with `bun is not recognized`
 
-Use npm directly:
+Prisma resolves the project root from `prisma/schema.prisma` (repo root), not `server/`. Install root dependencies first:
 
-```bash
-cd server
-npx --yes prisma generate --schema ../prisma/schema.prisma
+```powershell
+cd D:\inzozi-nziza
+npm install
+npm run prisma:generate
 ```
 
-Ensure you are using Node/npm, not a broken package-manager hook.
+If you only ran `npm install` inside `server/`, Prisma may try to auto-install packages with the wrong package manager.
 
 ### API exits on startup — invalid environment
 
 Check `server/.env` against `server/.env.example`. All three secrets must be at least 32 characters.
 
+### Frontend cannot reach the API
+
+- Start the API on port **3000** before the frontend.
+- In dev, leave `VITE_API_URL` empty so Vite proxies `/api` to localhost:3000.
+- `APP_URL` in `server/.env` must match the frontend origin (`http://localhost:8080`).
+
 ### CORS errors when calling the API from the frontend
 
 `APP_URL` in `server/.env` must exactly match the frontend origin (default `http://localhost:8080`).
-
-### Frontend login works but backend does not
-
-Expected until Phase 6 — the UI still uses Supabase. Test the API separately with curl/Postman.
 
 ### Port already in use
 
@@ -417,7 +415,6 @@ Expected until Phase 6 — the UI still uses Supabase. Test the API separately w
 |-------|----------------|
 | Frontend | React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, React Router, TanStack Query, Zod |
 | Backend | Fastify, Prisma, PostgreSQL (Neon), Argon2, JWT, Zod |
-| Legacy (being removed) | Supabase Auth + PostgREST |
 
 ---
 

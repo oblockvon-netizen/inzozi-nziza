@@ -23,26 +23,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { finesApi, toNumber, isStatus, ApiError } from "@/lib/api";
+import type { Fine } from "@/types/api";
 import { Download, Wallet, History } from "lucide-react";
-
-interface FinePayment {
-  id: string;
-  amount: number;
-  paid_at: string;
-}
-
-interface Fine {
-  id: string;
-  user_id: string;
-  amount: number;
-  amount_paid: number;
-  reason: string;
-  status: "pending" | "paid" | "cancelled";
-  issued_at: string;
-  paid_at: string | null;
-  payments?: FinePayment[];
-}
 
 interface FineDialogData {
   userId: string;
@@ -64,20 +47,14 @@ interface FinesManagementProps {
   onUpdate: () => void;
 }
 
-export default function FinesManagement({
-  users,
-  onUpdate,
-}: FinesManagementProps) {
+export default function FinesManagement({ users, onUpdate }: FinesManagementProps) {
   const [fines, setFines] = useState<Fine[]>([]);
   const [showFineDialog, setShowFineDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showPaymentHistoryDialog, setShowPaymentHistoryDialog] =
-    useState(false);
+  const [showPaymentHistoryDialog, setShowPaymentHistoryDialog] = useState(false);
   const [selectedFine, setSelectedFine] = useState<Fine | null>(null);
   const [fineData, setFineData] = useState<FineDialogData | null>(null);
-  const [paymentData, setPaymentData] = useState<PaymentDialogData | null>(
-    null
-  );
+  const [paymentData, setPaymentData] = useState<PaymentDialogData | null>(null);
   const [amount, setAmount] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -89,41 +66,18 @@ export default function FinesManagement({
     return () => clearInterval(refreshInterval);
   }, []);
 
+  const getAmountPaid = (fine: Fine) => toNumber(fine.amountPaid);
+  const getFineAmount = (fine: Fine) => toNumber(fine.amount);
+  const getRemaining = (fine: Fine) =>
+    fine.remaining != null ? toNumber(fine.remaining) : getFineAmount(fine) - getAmountPaid(fine);
+
   const loadFines = async () => {
     try {
-      // Fetch fines
-      const { data: finesData, error: finesError } = await supabase
-        .from("fines")
-        .select("*")
-        .order("issued_at", { ascending: false });
-
-      if (finesError) throw finesError;
-
-      // Fetch payments for each fine
-      const finesWithPayments = await Promise.all(
-        (finesData || []).map(async (fine) => {
-          const { data: payments, error: paymentsError } = await supabase
-            .from("fine_payments")
-            .select("*")
-            .eq("fine_id", fine.id)
-            .order("paid_at", { ascending: false });
-
-          if (paymentsError) throw paymentsError;
-
-          return {
-            ...fine,
-            payments: payments || [],
-          };
-        })
-      );
-
-      setFines(finesWithPayments);
-    } catch (error: any) {
-      toast({
-        title: "Error loading fines",
-        description: error.message,
-        variant: "destructive",
-      });
+      const { fines: data } = await finesApi.listAll();
+      setFines(data);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Failed to load fines";
+      toast({ title: "Error loading fines", description: message, variant: "destructive" });
     }
   };
 
@@ -135,26 +89,19 @@ export default function FinesManagement({
       if (isNaN(fineAmount) || fineAmount <= 0) {
         throw new Error("Please enter a valid amount");
       }
-
       if (!reason.trim()) {
         throw new Error("Please enter a reason for the fine");
       }
 
-      const { error } = await supabase.from("fines").insert({
-        user_id: fineData.userId,
+      await finesApi.issue({
+        userId: fineData.userId,
         amount: fineAmount,
-        amount_paid: 0,
         reason: reason.trim(),
-        status: "pending",
       });
-
-      if (error) throw error;
 
       toast({
         title: "Fine Added",
-        description: `Fine of ${fineAmount.toLocaleString()} RWF has been added for ${
-          fineData.userName
-        }`,
+        description: `Fine of ${fineAmount.toLocaleString()} RWF has been added for ${fineData.userName}`,
       });
 
       setAmount("");
@@ -163,12 +110,9 @@ export default function FinesManagement({
       setFineData(null);
       loadFines();
       onUpdate();
-    } catch (error: any) {
-      toast({
-        title: "Error adding fine",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Failed to add fine";
+      toast({ title: "Error adding fine", description: message, variant: "destructive" });
     }
   };
 
@@ -186,30 +130,7 @@ export default function FinesManagement({
         throw new Error("Payment amount cannot exceed the remaining balance");
       }
 
-      // Insert the payment record
-      const { error: paymentError } = await supabase
-        .from("fine_payments")
-        .insert({
-          fine_id: paymentData.fineId,
-          amount: payAmount,
-        });
-
-      if (paymentError) throw paymentError;
-
-      // Update the fine's amount_paid
-      const newAmountPaid = paymentData.amountPaid + payAmount;
-      const newStatus = newAmountPaid >= paymentData.totalAmount ? "paid" : "pending";
-      
-      const { error: updateError } = await supabase
-        .from("fines")
-        .update({ 
-          amount_paid: newAmountPaid,
-          status: newStatus,
-          paid_at: newStatus === "paid" ? new Date().toISOString() : null
-        })
-        .eq("id", paymentData.fineId);
-
-      if (updateError) throw updateError;
+      await finesApi.recordPayment(paymentData.fineId, { amount: payAmount });
 
       toast({
         title: "Payment Recorded",
@@ -221,23 +142,15 @@ export default function FinesManagement({
       setPaymentAmount("");
       loadFines();
       onUpdate();
-    } catch (error: any) {
-      toast({
-        title: "Error recording payment",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Payment failed";
+      toast({ title: "Error recording payment", description: message, variant: "destructive" });
     }
   };
 
   const handleCancelFine = async (fineId: string) => {
     try {
-      const { error } = await supabase
-        .from("fines")
-        .update({ status: "cancelled" })
-        .eq("id", fineId);
-
-      if (error) throw error;
+      await finesApi.cancel(fineId);
 
       toast({
         title: "Fine Cancelled",
@@ -246,29 +159,28 @@ export default function FinesManagement({
 
       loadFines();
       onUpdate();
-    } catch (error: any) {
-      toast({
-        title: "Error cancelling fine",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Cancel failed";
+      toast({ title: "Error cancelling fine", description: message, variant: "destructive" });
     }
   };
 
   const downloadFinesReport = () => {
+    if (fines.length === 0) return;
+
     const csvData = fines.map((fine) => {
-      const user = users.find((u) => u.user_id === fine.user_id);
+      const user = users.find((u) => u.user_id === fine.userId);
+      const amountPaid = getAmountPaid(fine);
+      const fineAmount = getFineAmount(fine);
       return {
-        "User Name": user?.full_name || "Unknown",
-        "Amount (RWF)": fine.amount,
-        "Amount Paid (RWF)": fine.amount_paid,
-        "Remaining (RWF)": fine.amount - fine.amount_paid,
+        "User Name": user?.full_name || fine.userName || "Unknown",
+        "Amount (RWF)": fineAmount,
+        "Amount Paid (RWF)": amountPaid,
+        "Remaining (RWF)": getRemaining(fine),
         Reason: fine.reason,
         Status: fine.status,
-        "Issued Date": new Date(fine.issued_at).toLocaleDateString(),
-        "Paid Date": fine.paid_at
-          ? new Date(fine.paid_at).toLocaleDateString()
-          : "-",
+        "Issued Date": new Date(fine.issuedAt).toLocaleDateString(),
+        "Paid Date": fine.paidAt ? new Date(fine.paidAt).toLocaleDateString() : "-",
       };
     });
 
@@ -276,16 +188,14 @@ export default function FinesManagement({
     const csvString = [
       headers.join(","),
       ...csvData.map((row) =>
-        headers.map((header) => `"${row[header]}"`).join(",")
+        headers.map((header) => `"${row[header as keyof typeof row]}"`).join(",")
       ),
     ].join("\n");
 
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `fines_report_${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
+    link.download = `fines_report_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
@@ -305,99 +215,99 @@ export default function FinesManagement({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>User</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Paid</TableHead>
-            <TableHead>Remaining</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Issued</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {fines.map((fine) => {
-            const user = users.find((u) => u.user_id === fine.user_id);
-            const remainingAmount = fine.amount - fine.amount_paid;
-            return (
-              <TableRow key={fine.id}>
-                <TableCell>{user?.full_name || "Unknown"}</TableCell>
-                <TableCell>{fine.amount.toLocaleString()} RWF</TableCell>
-                <TableCell>{fine.amount_paid.toLocaleString()} RWF</TableCell>
-                <TableCell>{remainingAmount.toLocaleString()} RWF</TableCell>
-                <TableCell className="max-w-[300px] truncate">
-                  {fine.reason}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={fine.status} />
-                </TableCell>
-                <TableCell>
-                  {new Date(fine.issued_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    {fine.status === "pending" && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPaymentData({
-                              fineId: fine.id,
-                              totalAmount: fine.amount,
-                              amountPaid: fine.amount_paid,
-                              userName: user?.full_name || "Unknown",
-                            });
-                            setShowPaymentDialog(true);
-                          }}
-                        >
-                          <Wallet className="h-4 w-4 mr-1" />
-                          Pay
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedFine(fine);
-                            setShowPaymentHistoryDialog(true);
-                          }}
-                        >
-                          <History className="h-4 w-4 mr-1" />
-                          History
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCancelFine(fine.id)}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    {(fine.status === "paid" ||
-                      fine.status === "cancelled") && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedFine(fine);
-                          setShowPaymentHistoryDialog(true);
-                        }}
-                      >
-                        <History className="h-4 w-4 mr-1" />
-                        History
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Remaining</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Issued</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fines.map((fine) => {
+                  const user = users.find((u) => u.user_id === fine.userId);
+                  const amountPaid = getAmountPaid(fine);
+                  const fineAmount = getFineAmount(fine);
+                  const remainingAmount = getRemaining(fine);
+                  const userName = user?.full_name || fine.userName || "Unknown";
+
+                  return (
+                    <TableRow key={fine.id}>
+                      <TableCell>{userName}</TableCell>
+                      <TableCell>{fineAmount.toLocaleString()} RWF</TableCell>
+                      <TableCell>{amountPaid.toLocaleString()} RWF</TableCell>
+                      <TableCell>{remainingAmount.toLocaleString()} RWF</TableCell>
+                      <TableCell className="max-w-[300px] truncate">{fine.reason}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={fine.status} />
+                      </TableCell>
+                      <TableCell>{new Date(fine.issuedAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          {isStatus(fine.status, "PENDING") && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setPaymentData({
+                                    fineId: fine.id,
+                                    totalAmount: fineAmount,
+                                    amountPaid,
+                                    userName,
+                                  });
+                                  setShowPaymentDialog(true);
+                                }}
+                              >
+                                <Wallet className="h-4 w-4 mr-1" />
+                                Pay
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedFine(fine);
+                                  setShowPaymentHistoryDialog(true);
+                                }}
+                              >
+                                <History className="h-4 w-4 mr-1" />
+                                History
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCancelFine(fine.id)}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          )}
+                          {(isStatus(fine.status, "PAID") ||
+                            isStatus(fine.status, "CANCELLED")) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedFine(fine);
+                                setShowPaymentHistoryDialog(true);
+                              }}
+                            >
+                              <History className="h-4 w-4 mr-1" />
+                              History
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -409,10 +319,7 @@ export default function FinesManagement({
             variant="outline"
             size="sm"
             onClick={() => {
-              setFineData({
-                userId: user.user_id,
-                userName: user.full_name,
-              });
+              setFineData({ userId: user.user_id, userName: user.full_name });
               setShowFineDialog(true);
             }}
           >
@@ -421,14 +328,11 @@ export default function FinesManagement({
         ))}
       </div>
 
-      {/* Add Fine Dialog */}
       <Dialog open={showFineDialog} onOpenChange={setShowFineDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Fine</DialogTitle>
-            <DialogDescription>
-              Add a fine for {fineData?.userName}
-            </DialogDescription>
+            <DialogDescription>Add a fine for {fineData?.userName}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -461,32 +365,23 @@ export default function FinesManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              Record a payment for {paymentData?.userName}
-            </DialogDescription>
+            <DialogDescription>Record a payment for {paymentData?.userName}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm mb-2">
-                <span>
-                  Total Amount: {paymentData?.totalAmount.toLocaleString()} RWF
-                </span>
-                <span>
-                  Already Paid: {paymentData?.amountPaid.toLocaleString()} RWF
-                </span>
+                <span>Total Amount: {paymentData?.totalAmount.toLocaleString()} RWF</span>
+                <span>Already Paid: {paymentData?.amountPaid.toLocaleString()} RWF</span>
               </div>
               <div className="bg-secondary/20 p-3 rounded-md mb-4">
                 <p className="text-sm font-medium">
                   Remaining Balance:{" "}
                   {paymentData
-                    ? (
-                        paymentData.totalAmount - paymentData.amountPaid
-                      ).toLocaleString()
+                    ? (paymentData.totalAmount - paymentData.amountPaid).toLocaleString()
                     : 0}{" "}
                   RWF
                 </p>
@@ -502,10 +397,7 @@ export default function FinesManagement({
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowPaymentDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
               Cancel
             </Button>
             <Button onClick={handlePayment}>Record Payment</Button>
@@ -513,34 +405,26 @@ export default function FinesManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Payment History Dialog */}
-      <Dialog
-        open={showPaymentHistoryDialog}
-        onOpenChange={setShowPaymentHistoryDialog}
-      >
+      <Dialog open={showPaymentHistoryDialog} onOpenChange={setShowPaymentHistoryDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Payment History</DialogTitle>
             <DialogDescription>Payment history for fine</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {selectedFine?.payments?.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No payments recorded yet.
-              </p>
+            {!selectedFine?.payments?.length ? (
+              <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
             ) : (
               <div className="space-y-2">
-                {selectedFine?.payments?.map((payment) => (
+                {selectedFine.payments.map((payment) => (
                   <div
                     key={payment.id}
                     className="flex justify-between items-center border-b pb-2"
                   >
                     <div>
-                      <p className="font-medium">
-                        {payment.amount.toLocaleString()} RWF
-                      </p>
+                      <p className="font-medium">{toNumber(payment.amount).toLocaleString()} RWF</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(payment.paid_at).toLocaleString()}
+                        {new Date(payment.paidAt).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -549,18 +433,13 @@ export default function FinesManagement({
                   <div className="flex justify-between text-sm font-medium">
                     <span>Total Paid:</span>
                     <span>
-                      {selectedFine?.amount_paid.toLocaleString()} RWF
+                      {selectedFine ? getAmountPaid(selectedFine).toLocaleString() : 0} RWF
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-medium mt-1">
                     <span>Remaining:</span>
                     <span>
-                      {selectedFine
-                        ? (
-                            selectedFine.amount - selectedFine.amount_paid
-                          ).toLocaleString()
-                        : 0}{" "}
-                      RWF
+                      {selectedFine ? getRemaining(selectedFine).toLocaleString() : 0} RWF
                     </span>
                   </div>
                 </div>
@@ -568,9 +447,7 @@ export default function FinesManagement({
             )}
           </div>
           <DialogFooter>
-            <Button onClick={() => setShowPaymentHistoryDialog(false)}>
-              Close
-            </Button>
+            <Button onClick={() => setShowPaymentHistoryDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

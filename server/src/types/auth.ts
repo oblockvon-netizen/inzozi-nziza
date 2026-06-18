@@ -12,6 +12,7 @@ export interface AuthUser {
   isApproved: boolean;
   status: string;
   fullName: string;
+  phone: string | null;
 }
 
 export interface SessionMeta {

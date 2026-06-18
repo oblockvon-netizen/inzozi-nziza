@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,115 +31,36 @@ import { GlassPanel } from "@/components/ui/glass-panel";
 import { MarketingLayout } from "@/components/layout/MarketingLayout";
 import UserFines from "@/components/UserFines";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  contributionsApi,
+  loansApi,
+  toNumber,
+  isStatus,
+  ApiError,
+} from "@/lib/api";
+import type { Contribution, ContributionSummary, Loan } from "@/types/api";
 import {
   LogOut,
   DollarSign,
-  Calendar,
   TrendingUp,
-  AlertCircle,
   CheckCircle2,
   Clock,
   CreditCard,
   Download,
-  FileText,
 } from "lucide-react";
-import { User, Session } from "@supabase/supabase-js";
 import { PDFDocument, rgb } from "pdf-lib";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-interface Profile {
-  id: string;
-  user_id: string;
-  full_name: string;
-  phone: string | null;
-  is_approved: boolean;
-  created_at: string;
-}
-
-interface Contribution {
-  id: string;
-  amount: number;
-  payment_date: string;
-  status: string;
-  reference_number: string | null;
-}
-
-interface Loan {
-  id: string;
-  amount: number;
-  purpose: string;
-  status: string;
-  applied_at: string;
-  approved_at: string | null;
-  admin_notes: string | null;
-  due_date: string | null;
-  interest_rate: number;
-  total_with_interest: number;
-  amount_paid: number;
-  last_payment_date: string | null;
-  payment_schedule: LoanPayment[];
-  installments_count: number;
-}
-
-interface LoanPayment {
-  id: string;
-  loan_id: string;
-  amount: number;
-  due_date: string;
-  paid_amount: number;
-  paid_date: string | null;
-  status: "pending" | "paid" | "overdue";
-}
 
 interface LoanApplicationData {
   amount: string;
   purpose: string;
 }
 
-interface DbLoan {
-  id: string;
-  user_id: string;
-  amount: number;
-  purpose: string;
-  status: string;
-  applied_at: string;
-  approved_at: string | null;
-  admin_notes: string | null;
-  due_date: string | null;
-  interest_rate: number | null;
-  total_with_interest: number | null;
-  amount_paid: number | null;
-  last_payment_date: string | null;
-  installments_count: number | null;
-  loan_payments: {
-    id: string;
-    loan_id: string;
-    amount: number;
-    due_date: string;
-    paid_amount: number;
-    paid_date: string | null;
-    status: string;
-    installment_number: number;
-    notes: string | null;
-  }[];
-  created_at: string;
-  updated_at: string;
-}
-
 const Dashboard = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [summary, setSummary] = useState<ContributionSummary | null>(null);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLoanDialog, setShowLoanDialog] = useState(false);
@@ -149,45 +70,11 @@ const Dashboard = () => {
   });
   const { toast } = useToast();
 
-  const REQUIRED_CONTRIBUTION = 105000; // 105,000 RWF
-
-  const getCurrentMonthContributions = (contributions: Contribution[]) => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    return contributions
-      .filter(
-        (c) =>
-          c.status === "completed" && new Date(c.payment_date) >= startOfMonth
-      )
-      .reduce((sum, c) => sum + c.amount, 0);
-  };
-
   useEffect(() => {
-    // Set up auth state listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (!session) {
-        window.location.href = "/auth";
-      }
-    });
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (!session) {
-        window.location.href = "/auth";
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    if (!authLoading && !user) {
+      navigate("/auth", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -196,114 +83,18 @@ const Dashboard = () => {
   }, [user]);
 
   const loadUserData = async () => {
-    if (!user) return;
-
     try {
-      // Load profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (profileError) {
-        // If profile doesn't exist, create one
-        if (profileError.code === "PGRST116") {
-          const { data: newProfile, error: createError } = await supabase
-            .from("profiles")
-            .insert({
-              user_id: user.id,
-              full_name:
-                user.user_metadata.full_name ||
-                user.email?.split("@")[0] ||
-                "User",
-              is_approved: false,
-            })
-            .select()
-            .single();
-
-          if (createError) throw createError;
-          setProfile(newProfile);
-        } else {
-          throw profileError;
-        }
-      } else {
-        setProfile(profileData);
-      }
-
-      // Load contributions
-      const { data: contributionsData, error: contributionsError } =
-        await supabase
-          .from("contributions")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("payment_date", { ascending: false });
-
-      if (contributionsError) throw contributionsError;
-      setContributions(contributionsData || []);
-
-      // Load loans with type assertion
-      const { data: loansData, error: loansError } = (await supabase
-        .from("loans")
-        .select(
-          `
-          *,
-          loan_payments (
-            id,
-            loan_id,
-            amount,
-            due_date,
-            paid_amount,
-            paid_date,
-            status,
-            installment_number,
-            notes
-          )
-        `
-        )
-        .eq("user_id", user.id)
-        .order("applied_at", { ascending: false })) as {
-        data: DbLoan[] | null;
-        error: any;
-      };
-
-      if (loansError) throw loansError;
-
-      // Transform the data to ensure all fields are present
-      const transformedLoans = (loansData || []).map((loan: DbLoan) => ({
-        id: loan.id,
-        user_id: loan.user_id,
-        amount: loan.amount,
-        purpose: loan.purpose,
-        status: loan.status,
-        applied_at: loan.applied_at,
-        approved_at: loan.approved_at,
-        admin_notes: loan.admin_notes,
-        due_date: loan.due_date,
-        interest_rate: loan.interest_rate || 0.05,
-        total_with_interest: loan.total_with_interest || loan.amount * 1.05,
-        amount_paid: loan.amount_paid || 0,
-        last_payment_date: loan.last_payment_date,
-        payment_schedule: (loan.loan_payments || []).map((payment) => ({
-          id: payment.id,
-          loan_id: payment.loan_id,
-          amount: payment.amount,
-          due_date: payment.due_date,
-          paid_amount: payment.paid_amount || 0,
-          paid_date: payment.paid_date,
-          status: payment.status as "pending" | "paid" | "overdue",
-        })),
-        installments_count: loan.installments_count || 3,
-      })) as Loan[];
-
-      setLoans(transformedLoans);
-    } catch (error: unknown) {
-      const e = error as Error;
-      toast({
-        title: "Error loading data",
-        description: e.message,
-        variant: "destructive",
-      });
+      const [contributionsRes, summaryRes, loansRes] = await Promise.all([
+        contributionsApi.mine(),
+        contributionsApi.summary(),
+        loansApi.mine(),
+      ]);
+      setContributions(contributionsRes.contributions);
+      setSummary(summaryRes.summary);
+      setLoans(loansRes.loans);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Failed to load data";
+      toast({ title: "Error loading data", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -311,14 +102,11 @@ const Dashboard = () => {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
-      window.location.href = "/auth";
-    } catch (error: any) {
-      toast({
-        title: "Error signing out",
-        description: error.message,
-        variant: "destructive",
-      });
+      await signOut();
+      navigate("/auth", { replace: true });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Sign out failed";
+      toast({ title: "Error signing out", description: message, variant: "destructive" });
     }
   };
 
@@ -328,50 +116,42 @@ const Dashboard = () => {
       if (isNaN(amount) || amount <= 0) {
         throw new Error("Please enter a valid amount");
       }
-
       if (!loanData.purpose.trim()) {
         throw new Error("Please enter the loan purpose");
       }
 
-      const { error } = await supabase.from("loans").insert({
-        user_id: user!.id,
-        amount: amount,
-        purpose: loanData.purpose.trim(),
-        status: "pending",
-        applied_at: new Date().toISOString(),
-      });
-
-      if (error) throw error;
+      await loansApi.apply({ amount, purpose: loanData.purpose.trim() });
 
       toast({
         title: "Loan application submitted",
         description: "Your application will be reviewed by an admin.",
       });
 
-      // Reload data
       loadUserData();
       setShowLoanDialog(false);
       setLoanData({ amount: "", purpose: "" });
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Submission failed";
       toast({
         title: "Error submitting loan application",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     }
   };
 
   const handleDownloadReport = async () => {
+    if (!user) return;
+
     try {
-      // Create a new PDF document
       const pdfDoc = await PDFDocument.create();
       let page = pdfDoc.addPage();
-      const { width, height } = page.getSize();
+      const { height } = page.getSize();
       const helveticaFont = await pdfDoc.embedFont("Helvetica");
       const fontSize = 12;
       const lineHeight = 20;
+      const required = summary?.requiredMonthlyContribution ?? 105000;
 
-      // Add title
       page.drawText("Inzozi Nziza Community Hub - Member Report", {
         x: 50,
         y: height - 50,
@@ -380,9 +160,8 @@ const Dashboard = () => {
         color: rgb(0, 0, 0),
       });
 
-      // Add member info
       let currentY = height - 100;
-      page.drawText(`Member: ${profile?.full_name}`, {
+      page.drawText(`Member: ${user.fullName}`, {
         x: 50,
         y: currentY,
         size: fontSize,
@@ -397,7 +176,6 @@ const Dashboard = () => {
         font: helveticaFont,
       });
 
-      // Add contribution summary
       currentY -= lineHeight * 2;
       page.drawText("Contribution Summary", {
         x: 50,
@@ -407,39 +185,20 @@ const Dashboard = () => {
       });
 
       currentY -= lineHeight;
-      const completedContributions = contributions.filter(
-        (c) => c.status === "completed"
-      );
-      const totalContributed = completedContributions.reduce(
-        (sum, c) => sum + c.amount,
-        0
-      );
-
-      page.drawText(
-        `Total Contributions: ${totalContributed.toLocaleString()} RWF`,
-        {
-          x: 50,
-          y: currentY,
-          size: fontSize,
-          font: helveticaFont,
-        }
-      );
+      const totalContributed = summary?.totalThisMonth ?? 0;
+      page.drawText(`Total This Month: ${totalContributed.toLocaleString()} RWF`, {
+        x: 50,
+        y: currentY,
+        size: fontSize,
+        font: helveticaFont,
+      });
 
       currentY -= lineHeight;
       page.drawText(
-        `Progress: ${Math.min(
-          (totalContributed / REQUIRED_CONTRIBUTION) * 100,
-          100
-        ).toFixed(1)}%`,
-        {
-          x: 50,
-          y: currentY,
-          size: fontSize,
-          font: helveticaFont,
-        }
+        `Progress: ${Math.min((totalContributed / required) * 100, 100).toFixed(1)}%`,
+        { x: 50, y: currentY, size: fontSize, font: helveticaFont }
       );
 
-      // Add contribution details
       currentY -= lineHeight * 2;
       page.drawText("Recent Contributions", {
         x: 50,
@@ -451,28 +210,16 @@ const Dashboard = () => {
       currentY -= lineHeight;
       contributions.slice(0, 10).forEach((contribution) => {
         if (currentY < 50) {
-          // Add new page if we're running out of space
           page = pdfDoc.addPage();
           currentY = height - 50;
         }
-
         page.drawText(
-          `${new Date(
-            contribution.payment_date
-          ).toLocaleDateString()} - ${contribution.amount.toLocaleString()} RWF (${
-            contribution.status
-          })`,
-          {
-            x: 50,
-            y: currentY,
-            size: fontSize,
-            font: helveticaFont,
-          }
+          `${new Date(contribution.paymentDate).toLocaleDateString()} - ${toNumber(contribution.amount).toLocaleString()} RWF (${contribution.status})`,
+          { x: 50, y: currentY, size: fontSize, font: helveticaFont }
         );
         currentY -= lineHeight;
       });
 
-      // Add loan summary
       currentY -= lineHeight;
       page.drawText("Loan History", {
         x: 50,
@@ -484,25 +231,13 @@ const Dashboard = () => {
       currentY -= lineHeight;
       loans.forEach((loan) => {
         if (currentY < 50) {
-          // Add new page if we're running out of space
           page = pdfDoc.addPage();
           currentY = height - 50;
         }
-
         page.drawText(
-          `${new Date(
-            loan.applied_at
-          ).toLocaleDateString()} - ${loan.amount.toLocaleString()} RWF (${
-            loan.status
-          })`,
-          {
-            x: 50,
-            y: currentY,
-            size: fontSize,
-            font: helveticaFont,
-          }
+          `${new Date(loan.appliedAt).toLocaleDateString()} - ${toNumber(loan.amount).toLocaleString()} RWF (${loan.status})`,
+          { x: 50, y: currentY, size: fontSize, font: helveticaFont }
         );
-
         if (loan.purpose) {
           currentY -= lineHeight;
           page.drawText(`Purpose: ${loan.purpose}`, {
@@ -513,22 +248,15 @@ const Dashboard = () => {
             color: rgb(0.4, 0.4, 0.4),
           });
         }
-
         currentY -= lineHeight;
       });
 
-      // Save the PDF
       const pdfBytes = await pdfDoc.save();
-      const buffer = new Uint8Array(pdfBytes).buffer;
-
-      // Create a download link
-      const blob = new Blob([buffer], { type: "application/pdf" });
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `inzozi-member-report-${
-        new Date().toISOString().split("T")[0]
-      }.pdf`;
+      link.download = `inzozi-member-report-${new Date().toISOString().split("T")[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -538,28 +266,28 @@ const Dashboard = () => {
         title: "Report Generated",
         description: "Your member report has been downloaded.",
       });
-    } catch (error: unknown) {
-      const e = error as Error;
-      toast({
-        title: "Error generating report",
-        description: e.message,
-        variant: "destructive",
-      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Report failed";
+      toast({ title: "Error generating report", description: message, variant: "destructive" });
     }
   };
 
-  const totalContributions = getCurrentMonthContributions(contributions);
+  const requiredContribution = summary?.requiredMonthlyContribution ?? 105000;
+  const totalContributions = summary?.totalThisMonth ?? 0;
+  const contributionProgress = summary?.progressPercent ?? 0;
 
-  const contributionProgress = Math.min(
-    (totalContributions / REQUIRED_CONTRIBUTION) * 100,
-    100
-  );
-
-  if (loading) {
+  if (authLoading || loading) {
     return <LoadingSpinner message="Loading your dashboard..." />;
   }
 
-  if (!profile?.is_approved) {
+  if (!user) {
+    return null;
+  }
+
+  const isPending =
+    user.accessRole === "PENDING_USER" || !user.isApproved;
+
+  if (isPending) {
     return (
       <MarketingLayout>
         <div className="flex min-h-screen items-center justify-center p-4">
@@ -582,237 +310,204 @@ const Dashboard = () => {
     );
   }
 
+  const approvedLoans = loans.filter((l) => isStatus(l.status, "APPROVED"));
+
   return (
     <AppShell
       title="Member dashboard"
-      subtitle={`Welcome back, ${profile?.full_name}`}
+      subtitle={`Welcome back, ${user.fullName}`}
       onSignOut={handleSignOut}
     >
       <div className="grid gap-6 lg:grid-cols-12">
-          {/* Contribution Status */}
-          <Card className="lg:col-span-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <DollarSign className="h-5 w-5 text-accent" />
-                Contribution status
-              </CardTitle>
-              <CardDescription>
-                Required: {REQUIRED_CONTRIBUTION.toLocaleString()} RWF per month
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ContributionProgress
-                current={totalContributions}
-                required={REQUIRED_CONTRIBUTION}
-                progressPercent={contributionProgress}
-                monthLabel={new Date().toLocaleString("default", {
-                  month: "long",
-                  year: "numeric",
-                })}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <div className="grid gap-4 lg:col-span-4">
-            <StatCard
-              title="Total payments"
-              value={contributions.length}
-              icon={TrendingUp}
-              index={0}
-              accent="emerald"
+        <Card className="lg:col-span-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <DollarSign className="h-5 w-5 text-accent" />
+              Contribution status
+            </CardTitle>
+            <CardDescription>
+              Required: {requiredContribution.toLocaleString()} RWF per month
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ContributionProgress
+              current={totalContributions}
+              required={requiredContribution}
+              progressPercent={contributionProgress}
+              monthLabel={new Date().toLocaleString("default", {
+                month: "long",
+                year: "numeric",
+              })}
             />
-            <StatCard
-              title="Loan applications"
-              value={loans.length}
-              icon={CreditCard}
-              index={1}
-              accent="navy"
-            />
-            <StatCard
-              title="Approved loans"
-              value={loans.filter((l) => l.status === "approved").length}
-              icon={CheckCircle2}
-              index={2}
-              accent="gold"
-            />
-            <Button onClick={() => setShowLoanDialog(true)} className="w-full gap-2 bg-accent hover:bg-accent/90">
-              <CreditCard className="h-4 w-4" />
-              Apply for loan
-            </Button>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Recent Activity */}
-          <Card className="lg:col-span-8">
-            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-lg">Recent activity</CardTitle>
-                <CardDescription>
-                  Your recent contributions and loans
-                </CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleDownloadReport}
-                className="hidden sm:flex"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Report
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-8">
-                {/* Recent Contributions */}
-                <div>
-                  <SectionHeader
-                    title="Recent contributions"
-                    className="mb-4"
-                  />
-                  {contributions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No contributions yet
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {contributions.slice(0, 5).map((contribution) => (
-                        <div
-                          key={contribution.id}
-                          className="flex items-center justify-between border-b pb-2 last:border-0"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {contribution.amount.toLocaleString()} RWF
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(
-                                contribution.payment_date
-                              ).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <StatusBadge status={contribution.status} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Recent Fines */}
-                <div>
-                  <SectionHeader title="Recent fines" className="mb-4" />
-                  {user && <UserFines userId={user.id} />}
-                </div>
-
-                <Separator />
-
-                {/* Recent Loans */}
-                <div>
-                  <SectionHeader title="Recent loans" className="mb-4" />
-                  {loans.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No loan applications yet
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {loans.slice(0, 5).map((loan) => (
-                        <div
-                          key={loan.id}
-                          className="flex items-center justify-between border-b pb-2 last:border-0"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {loan.amount.toLocaleString()} RWF
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {loan.purpose}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Applied:{" "}
-                              {new Date(loan.applied_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <StatusBadge status={loan.status} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Active Loans */}
-          <Card className="lg:col-span-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Active Loans
-              </CardTitle>
-              <CardDescription>Your current loan status</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loans
-                .filter((loan) => loan.status === "approved")
-                .map((loan) => (
-                  <div key={loan.id} className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Total Loan</span>
-                        <span>
-                          {loan.total_with_interest.toLocaleString()} RWF
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Amount Paid</span>
-                        <span>{loan.amount_paid.toLocaleString()} RWF</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-medium bg-secondary/20 p-2 rounded-md">
-                        <span>Remaining Balance</span>
-                        <span>
-                          {(
-                            loan.total_with_interest - loan.amount_paid
-                          ).toLocaleString()}{" "}
-                          RWF
-                        </span>
-                      </div>
-                      {loan.last_payment_date && (
-                        <p className="text-xs text-muted-foreground">
-                          Last payment:{" "}
-                          {new Date(
-                            loan.last_payment_date
-                          ).toLocaleDateString()}
-                        </p>
-                      )}
-                      <AnimatedProgress
-                        value={
-                          (loan.amount_paid / loan.total_with_interest) * 100
-                        }
-                        showLabel
-                        className="mt-2"
-                      />
-                    </div>
-                    <Separator />
-                  </div>
-                ))}
-              {loans.filter((loan) => loan.status === "approved").length ===
-                0 && (
-                <div className="text-center text-sm text-muted-foreground">
-                  No active loans
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 lg:col-span-4">
+          <StatCard
+            title="Total payments"
+            value={contributions.length}
+            icon={TrendingUp}
+            index={0}
+            accent="emerald"
+          />
+          <StatCard
+            title="Loan applications"
+            value={loans.length}
+            icon={CreditCard}
+            index={1}
+            accent="navy"
+          />
+          <StatCard
+            title="Approved loans"
+            value={approvedLoans.length}
+            icon={CheckCircle2}
+            index={2}
+            accent="gold"
+          />
+          <Button
+            onClick={() => setShowLoanDialog(true)}
+            className="w-full gap-2 bg-accent hover:bg-accent/90"
+          >
+            <CreditCard className="h-4 w-4" />
+            Apply for loan
+          </Button>
         </div>
 
-      {/* Loan Application Dialog */}
+        <Card className="lg:col-span-8">
+          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg">Recent activity</CardTitle>
+              <CardDescription>Your recent contributions and loans</CardDescription>
+            </div>
+            <Button variant="outline" onClick={handleDownloadReport} className="hidden sm:flex">
+              <Download className="h-4 w-4 mr-2" />
+              Download Report
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-8">
+              <div>
+                <SectionHeader title="Recent contributions" className="mb-4" />
+                {contributions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No contributions yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {contributions.slice(0, 5).map((contribution) => (
+                      <div
+                        key={contribution.id}
+                        className="flex items-center justify-between border-b pb-2 last:border-0"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {toNumber(contribution.amount).toLocaleString()} RWF
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(contribution.paymentDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <StatusBadge status={contribution.status} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div>
+                <SectionHeader title="Recent fines" className="mb-4" />
+                <UserFines />
+              </div>
+
+              <Separator />
+
+              <div>
+                <SectionHeader title="Recent loans" className="mb-4" />
+                {loans.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No loan applications yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {loans.slice(0, 5).map((loan) => (
+                      <div
+                        key={loan.id}
+                        className="flex items-center justify-between border-b pb-2 last:border-0"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {toNumber(loan.amount).toLocaleString()} RWF
+                          </p>
+                          <p className="text-sm text-muted-foreground">{loan.purpose}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Applied: {new Date(loan.appliedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <StatusBadge status={loan.status} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Active Loans
+            </CardTitle>
+            <CardDescription>Your current loan status</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {approvedLoans.map((loan) => {
+              const totalWithInterest =
+                toNumber(loan.totalWithInterest) || toNumber(loan.amount) * 1.05;
+              const amountPaid = toNumber(loan.amountPaid);
+              return (
+                <div key={loan.id} className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Loan</span>
+                      <span>{totalWithInterest.toLocaleString()} RWF</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Amount Paid</span>
+                      <span>{amountPaid.toLocaleString()} RWF</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-medium bg-secondary/20 p-2 rounded-md">
+                      <span>Remaining Balance</span>
+                      <span>{(totalWithInterest - amountPaid).toLocaleString()} RWF</span>
+                    </div>
+                    {loan.lastPaymentDate && (
+                      <p className="text-xs text-muted-foreground">
+                        Last payment:{" "}
+                        {new Date(loan.lastPaymentDate).toLocaleDateString()}
+                      </p>
+                    )}
+                    <AnimatedProgress
+                      value={(amountPaid / totalWithInterest) * 100}
+                      showLabel
+                      className="mt-2"
+                    />
+                  </div>
+                  <Separator />
+                </div>
+              );
+            })}
+            {approvedLoans.length === 0 && (
+              <div className="text-center text-sm text-muted-foreground">No active loans</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Apply for Loan</DialogTitle>
             <DialogDescription>
-              Please provide the loan details. Your application will be reviewed
-              by an admin.
+              Please provide the loan details. Your application will be reviewed by an admin.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -822,9 +517,7 @@ const Dashboard = () => {
                 id="amount"
                 type="number"
                 value={loanData.amount}
-                onChange={(e) =>
-                  setLoanData({ ...loanData, amount: e.target.value })
-                }
+                onChange={(e) => setLoanData({ ...loanData, amount: e.target.value })}
                 placeholder="Enter amount in RWF"
               />
             </div>
@@ -833,9 +526,7 @@ const Dashboard = () => {
               <Textarea
                 id="purpose"
                 value={loanData.purpose}
-                onChange={(e) =>
-                  setLoanData({ ...loanData, purpose: e.target.value })
-                }
+                onChange={(e) => setLoanData({ ...loanData, purpose: e.target.value })}
                 placeholder="Explain why you need this loan"
                 rows={4}
               />

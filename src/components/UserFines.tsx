@@ -1,79 +1,38 @@
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
-import { useState, useEffect } from "react";
+import { finesApi, toNumber, ApiError } from "@/lib/api";
+import type { Fine } from "@/types/api";
 
-interface Fine {
-  id: string;
-  user_id: string;
-  amount: number;
-  reason: string;
-  status: "pending" | "paid" | "cancelled";
-  issued_at: string;
-  paid_at: string | null;
-  admin_notes: string | null;
-  created_at: string;
-  fine_payments: {
-    amount: number;
-  }[];
-}
-
-interface UserFinesProps {
-  userId: string;
-}
-
-function UserFines({ userId }: UserFinesProps) {
+function UserFines() {
   const [fines, setFines] = useState<Fine[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     loadFines();
-  }, [userId]);
+  }, []);
 
   const loadFines = async () => {
     try {
-      const { data, error } = await supabase
-        .from("fines")
-        .select(
-          `
-          *,
-          fine_payments (
-            amount
-          )
-        `
-        )
-        .eq("user_id", userId)
-        .order("issued_at", { ascending: false });
-
-      if (error) throw error;
-      setFines(data || []);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "An error occurred while loading fines";
-      toast({
-        title: "Error loading fines",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      const { fines: data } = await finesApi.mine();
+      setFines(data);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Failed to load fines";
+      toast({ title: "Error loading fines", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   const getRemainingAmount = (fine: Fine) => {
-    const totalPaid =
-      fine.fine_payments?.reduce((sum, payment) => sum + payment.amount, 0) ||
-      0;
-    return fine.amount - totalPaid;
+    if (fine.remaining != null) return toNumber(fine.remaining);
+    return toNumber(fine.amount) - toNumber(fine.amountPaid);
   };
 
   const totalPendingAmount = fines
-    .filter((fine) => fine.status === "pending")
+    .filter((fine) => fine.status === "PENDING")
     .reduce((sum, fine) => sum + getRemainingAmount(fine), 0);
 
   if (loading) {
@@ -86,9 +45,7 @@ function UserFines({ userId }: UserFinesProps) {
   }
 
   if (fines.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No fines on your account</p>
-    );
+    return <p className="text-sm text-muted-foreground">No fines on your account</p>;
   }
 
   return (
@@ -105,26 +62,23 @@ function UserFines({ userId }: UserFinesProps) {
         </div>
       )}
       <div className="space-y-3">
-        {fines.map((fine) => {
-          const remainingAmount = getRemainingAmount(fine);
-          return (
-            <div
-              key={fine.id}
-              className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-4 py-3"
-            >
-              <div>
-                <p className="font-medium tabular-nums">
-                  {remainingAmount.toLocaleString()} RWF
-                </p>
-                <p className="text-sm text-muted-foreground">{fine.reason}</p>
-                <p className="text-xs text-muted-foreground">
-                  Issued: {new Date(fine.issued_at).toLocaleDateString()}
-                </p>
-              </div>
-              <StatusBadge status={fine.status} />
+        {fines.map((fine) => (
+          <div
+            key={fine.id}
+            className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-4 py-3"
+          >
+            <div>
+              <p className="font-medium tabular-nums">
+                {getRemainingAmount(fine).toLocaleString()} RWF
+              </p>
+              <p className="text-sm text-muted-foreground">{fine.reason}</p>
+              <p className="text-xs text-muted-foreground">
+                Issued: {new Date(fine.issuedAt).toLocaleDateString()}
+              </p>
             </div>
-          );
-        })}
+            <StatusBadge status={fine.status} />
+          </div>
+        ))}
       </div>
     </div>
   );

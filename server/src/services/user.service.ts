@@ -33,5 +33,21 @@ export async function buildAuthUser(userId: string): Promise<AuthUser> {
     isApproved: user.profile.isApproved,
     status: user.profile.status,
     fullName: user.profile.fullName,
+    phone: user.profile.phone,
   };
+}
+
+export async function updateProfile(
+  userId: string,
+  input: { fullName: string; phone?: string }
+): Promise<AuthUser> {
+  await prisma.profile.update({
+    where: { userId },
+    data: {
+      fullName: input.fullName,
+      phone: input.phone ?? null,
+    },
+  });
+
+  return buildAuthUser(userId);
 }

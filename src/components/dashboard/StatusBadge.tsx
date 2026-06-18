@@ -9,10 +9,13 @@ interface StatusBadgeProps {
 }
 
 function getStatusVariant(status: string): StatusVariant {
-  switch (status) {
+  const normalized = status.toLowerCase();
+  switch (normalized) {
     case "completed":
     case "approved":
     case "paid":
+    case "repaid":
+    case "disbursed":
       return "default";
     case "pending":
       return "secondary";
@@ -20,6 +23,7 @@ function getStatusVariant(status: string): StatusVariant {
     case "denied":
     case "cancelled":
     case "overdue":
+    case "defaulted":
       return "destructive";
     default:
       return "outline";
@@ -32,7 +36,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       variant={getStatusVariant(status)}
       className={cn("capitalize tabular-nums", className)}
     >
-      {status}
+      {status.toLowerCase()}
     </Badge>
   );
 }
