@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { AnimatedProgress } from "@/components/dashboard/AnimatedProgress";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { EmptyState } from "@/components/ux/EmptyState";
+import { AnimatedCard } from "@/components/ux/AnimatedCard";
 import { CreditCard, Plus } from "lucide-react";
 import { toNumber } from "@/lib/api";
 import type { Loan } from "@/types/api";
@@ -51,28 +53,30 @@ export function LoanOverviewSection({ loans, onApplyLoan }: LoanOverviewSectionP
         </CardHeader>
         <CardContent>
           {loans.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 py-12 text-center">
-              <CreditCard className="mb-3 h-10 w-10 text-muted-foreground/50" />
-              <p className="font-medium text-muted-foreground">No loans yet</p>
-              <p className="mt-1 text-sm text-muted-foreground/80">
-                Apply for a community loan when you need support
-              </p>
-              <Button onClick={onApplyLoan} className="mt-4 gap-2 bg-accent hover:bg-accent/90">
-                Apply for loan
-              </Button>
-            </div>
+            <EmptyState
+              icon={CreditCard}
+              title="No loans yet"
+              description="Apply for a community loan when you need support"
+              action={
+                <Button onClick={onApplyLoan} className="gap-2 bg-accent hover:bg-accent/90">
+                  Apply for loan
+                </Button>
+              }
+              compact
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {loans.slice(0, 6).map((loan) => {
+              {loans.slice(0, 6).map((loan, index) => {
                 const total =
                   toNumber(loan.totalWithInterest) || toNumber(loan.amount) * 1.05;
                 const paid = toNumber(loan.amountPaid);
                 const pct = total > 0 ? (paid / total) * 100 : 0;
 
                 return (
-                  <div
+                  <AnimatedCard
                     key={loan.id}
-                    className="rounded-xl border border-border/60 bg-muted/20 p-4 transition-shadow hover:shadow-md"
+                    index={index}
+                    className="rounded-xl border border-border/60 bg-muted/20 p-4"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -99,7 +103,7 @@ export function LoanOverviewSection({ loans, onApplyLoan }: LoanOverviewSectionP
                     <p className="mt-3 text-xs text-muted-foreground">
                       Applied {new Date(loan.appliedAt).toLocaleDateString()}
                     </p>
-                  </div>
+                  </AnimatedCard>
                 );
               })}
             </div>

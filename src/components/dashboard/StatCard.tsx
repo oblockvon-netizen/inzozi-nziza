@@ -1,5 +1,6 @@
-import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
+import { AnimatedCard } from "@/components/ux/AnimatedCard";
+import { CountUp } from "@/components/ux/CountUp";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -10,6 +11,10 @@ interface StatCardProps {
   index?: number;
   accent?: "default" | "emerald" | "gold" | "navy";
   className?: string;
+  countUp?: number;
+  countUpFormatter?: (value: number) => string;
+  countUpSuffix?: string;
+  countUpPrefix?: string;
 }
 
 const accentStyles = {
@@ -27,12 +32,14 @@ export function StatCard({
   index = 0,
   accent = "default",
   className,
+  countUp,
+  countUpFormatter,
+  countUpSuffix,
+  countUpPrefix,
 }: StatCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+    <AnimatedCard
+      index={index}
       className={cn(
         "rounded-xl border border-border/60 bg-card p-6 shadow-sm transition-shadow hover:shadow-md",
         className
@@ -41,17 +48,28 @@ export function StatCard({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {value}
-          </p>
+          {countUp !== undefined ? (
+            <p className="text-2xl font-semibold tracking-tight text-foreground">
+              <CountUp
+                value={countUp}
+                formatter={countUpFormatter}
+                suffix={countUpSuffix}
+                prefix={countUpPrefix}
+              />
+            </p>
+          ) : (
+            <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+              {value}
+            </p>
+          )}
           {subtitle && (
             <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}
         </div>
         <div className={cn("rounded-lg p-2.5", accentStyles[accent])}>
-          <Icon className="h-5 w-5" />
+          <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
       </div>
-    </motion.div>
+    </AnimatedCard>
   );
 }

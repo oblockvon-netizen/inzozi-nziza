@@ -1,8 +1,8 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { ZodSchema } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 import { AppError } from "../utils/errors.js";
 
-export function validateBody<T>(schema: ZodSchema<T>) {
+export function validateBody<T>(schema: ZodType<T, ZodTypeDef, unknown>) {
   return async (request: FastifyRequest): Promise<void> => {
     const result = schema.safeParse(request.body);
     if (!result.success) {
@@ -12,7 +12,7 @@ export function validateBody<T>(schema: ZodSchema<T>) {
   };
 }
 
-export function validateQuery<T>(schema: ZodSchema<T>) {
+export function validateQuery<T>(schema: ZodType<T, ZodTypeDef, unknown>) {
   return async (request: FastifyRequest): Promise<void> => {
     const result = schema.safeParse(request.query);
     if (!result.success) {
@@ -22,7 +22,7 @@ export function validateQuery<T>(schema: ZodSchema<T>) {
   };
 }
 
-export function validateParams<T>(schema: ZodSchema<T>) {
+export function validateParams<T>(schema: ZodType<T, ZodTypeDef, unknown>) {
   return async (request: FastifyRequest): Promise<void> => {
     const result = schema.safeParse(request.params);
     if (!result.success) {

@@ -2,11 +2,13 @@ import type {
   AdminStats,
   AdminUser,
   ApiErrorBody,
+  AppNotification,
   AuthUser,
   Contribution,
   ContributionSummary,
   Fine,
   Loan,
+  UserSession,
 } from "@/types/api";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -167,6 +169,34 @@ export const meApi = {
     request<{ user: AuthUser; message: string }>("/api/v1/me/profile", {
       method: "PATCH",
       body: JSON.stringify(body),
+    }),
+  sessions: () => request<{ sessions: UserSession[] }>("/api/v1/me/sessions"),
+  revokeSession: (id: string) =>
+    request<{ message: string }>(`/api/v1/me/sessions/${id}`, { method: "DELETE" }),
+  revokeOtherSessions: () =>
+    request<{ message: string; count: number }>("/api/v1/me/sessions/revoke-others", {
+      method: "POST",
+    }),
+  notifications: (params?: { read?: boolean; type?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.read !== undefined) q.set("read", String(params.read));
+    if (params?.type) q.set("type", params.type);
+    if (params?.limit) q.set("limit", String(params.limit));
+    const query = q.toString();
+    return request<{ notifications: AppNotification[] }>(
+      `/api/v1/me/notifications${query ? `?${query}` : ""}`
+    );
+  },
+  unreadCount: () =>
+    request<{ count: number }>("/api/v1/me/notifications/unread-count"),
+  markNotificationRead: (id: string) =>
+    request<{ notification: AppNotification }>(
+      `/api/v1/me/notifications/${id}/read`,
+      { method: "PATCH" }
+    ),
+  markAllNotificationsRead: () =>
+    request<{ message: string; count: number }>("/api/v1/me/notifications/read-all", {
+      method: "POST",
     }),
 };
 

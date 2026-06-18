@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/ux/EmptyState";
 import { Bell, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import type { DashboardNotification } from "@/lib/dashboard-analytics";
 import { cn } from "@/lib/utils";
@@ -52,10 +53,12 @@ export function NotificationsPanel({ notifications }: NotificationsPanelProps) {
         </CardHeader>
         <CardContent>
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-center">
-              <CheckCircle2 className="mb-2 h-8 w-8 text-accent/50" />
-              <p className="text-sm text-muted-foreground">You&apos;re all caught up</p>
-            </div>
+            <EmptyState
+              icon={CheckCircle2}
+              title="You're all caught up"
+              description="Account updates will show here"
+              compact
+            />
           ) : (
             <div className="space-y-3">
               {notifications.map((note, index) => {

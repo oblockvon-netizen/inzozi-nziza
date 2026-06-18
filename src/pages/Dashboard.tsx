@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { DashboardSkeleton } from "@/components/ux/skeletons/DashboardSkeleton";
+import { ErrorState } from "@/components/ux/ErrorState";
 import { AppShell } from "@/components/layout/AppShell";
 import { GlassPanel } from "@/components/ui/glass-panel";
 import { MarketingLayout } from "@/components/layout/MarketingLayout";
@@ -58,6 +60,7 @@ const Dashboard = () => {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [fines, setFines] = useState<Fine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showLoanDialog, setShowLoanDialog] = useState(false);
   const [loanData, setLoanData] = useState<LoanApplicationData>({
     amount: "",
@@ -79,6 +82,7 @@ const Dashboard = () => {
 
   const loadUserData = async () => {
     try {
+      setLoadError(null);
       const [contributionsRes, summaryRes, loansRes, finesRes] = await Promise.all([
         contributionsApi.mine(),
         contributionsApi.summary(),
@@ -91,6 +95,7 @@ const Dashboard = () => {
       setFines(finesRes.fines);
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Failed to load data";
+      setLoadError(message);
       toast({ title: "Error loading data", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -250,12 +255,31 @@ const Dashboard = () => {
     year: "numeric",
   });
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return <LoadingSpinner message="Loading your dashboard..." />;
+  }
+
+  if (loading && !loadError) {
+    return user ? (
+      <DashboardSkeleton />
+    ) : (
+      <LoadingSpinner message="Loading your dashboard..." />
+    );
   }
 
   if (!user) {
     return null;
+  }
+
+  const hasData =
+    contributions.length > 0 || loans.length > 0 || summary !== null || fines.length > 0;
+
+  if (loadError && !hasData) {
+    return (
+      <AppShell title="Analytics" subtitle={user.fullName} onSignOut={handleSignOut}>
+        <ErrorState message={loadError} onRetry={loadUserData} />
+      </AppShell>
+    );
   }
 
   const isPending = user.accessRole === "PENDING_USER" || !user.isApproved;
@@ -285,6 +309,14 @@ const Dashboard = () => {
 
   return (
     <AppShell title="Analytics" subtitle={user.fullName} onSignOut={handleSignOut}>
+      {loadError && (
+        <ErrorState
+          message={loadError}
+          onRetry={loadUserData}
+          compact
+          className="mb-6"
+        />
+      )}
       <div className="space-y-6">
         <WelcomeHero
           user={user}

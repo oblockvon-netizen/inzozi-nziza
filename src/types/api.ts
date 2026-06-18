@@ -111,3 +111,22 @@ export interface AdminStats {
   totalFines: number;
   requiredMonthlyContribution: number;
 }
+
+export interface UserSession {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+  readAt: string | null;
+}

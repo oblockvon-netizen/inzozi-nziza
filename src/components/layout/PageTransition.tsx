@@ -1,5 +1,7 @@
+import { useEffect, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { pageTransition, motionTransition } from "@/lib/motion";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -7,12 +9,25 @@ interface PageTransitionProps {
 }
 
 export function PageTransition({ children, className }: PageTransitionProps) {
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    const main = document.getElementById("main-content");
+    if (main) {
+      main.focus({ preventScroll: true });
+    }
+  }, []);
+
+  if (reduced) {
+    return <div className={className}>{children}</div>;
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+      initial={pageTransition.initial}
+      animate={pageTransition.animate}
+      exit={pageTransition.exit}
+      transition={motionTransition(false, pageTransition.transition)}
       className={className}
     >
       {children}

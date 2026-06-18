@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { AdminSkeleton } from "@/components/ux/skeletons/AdminSkeleton";
+import { ErrorState } from "@/components/ux/ErrorState";
 import { AppShell } from "@/components/layout/AppShell";
 import { MarketingLayout } from "@/components/layout/MarketingLayout";
 import { GlassPanel } from "@/components/ui/glass-panel";
@@ -61,6 +63,7 @@ const AdminDashboard = () => {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [fines, setFines] = useState<Fine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
@@ -106,6 +109,7 @@ const AdminDashboard = () => {
   const loadAdminData = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
+      setLoadError(null);
       const [usersRes, contributionsRes, loansRes, finesRes] = await Promise.all([
         adminApi.users(),
         contributionsApi.listAll(),
@@ -118,6 +122,7 @@ const AdminDashboard = () => {
       setFines(finesRes.fines);
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Failed to load data";
+      setLoadError(message);
       toast({ title: "Error loading admin data", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -363,11 +368,25 @@ const AdminDashboard = () => {
     }
   };
 
-  if (authLoading || (isAdmin && loading)) {
+  if (authLoading) {
     return <LoadingSpinner message="Loading operations center..." />;
   }
 
+  if (isAdmin && loading && !loadError) {
+    return <AdminSkeleton />;
+  }
+
   if (!user) return null;
+
+  const hasAdminData = users.length > 0 || contributions.length > 0;
+
+  if (isAdmin && loadError && !hasAdminData) {
+    return (
+      <AppShell title="Operations" subtitle={user.fullName} variant="admin" onSignOut={handleSignOut}>
+        <ErrorState message={loadError} onRetry={() => loadAdminData()} />
+      </AppShell>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -402,6 +421,14 @@ const AdminDashboard = () => {
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
+        {loadError && (
+          <ErrorState
+            message={loadError}
+            onRetry={() => loadAdminData()}
+            compact
+            className="mb-2"
+          />
+        )}
         <AdminOpsHero
           pendingCount={pendingTotal}
           onRefresh={() => loadAdminData(true)}

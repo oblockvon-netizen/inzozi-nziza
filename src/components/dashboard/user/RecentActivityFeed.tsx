@@ -8,12 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
-import {
-  Activity,
-  AlertCircle,
-  CreditCard,
-  DollarSign,
-} from "lucide-react";
+import { EmptyState } from "@/components/ux/EmptyState";
+import { Activity, AlertCircle, CreditCard, DollarSign } from "lucide-react";
 import type { ActivityItem } from "@/lib/dashboard-analytics";
 import { cn } from "@/lib/utils";
 
@@ -55,9 +51,12 @@ export function RecentActivityFeed({ items }: RecentActivityFeedProps) {
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No activity yet — your transactions will appear here
-            </p>
+            <EmptyState
+              icon={Activity}
+              title="No activity yet"
+              description="Contributions, loans, and fines will appear in your timeline"
+              compact
+            />
           ) : (
             <div className="space-y-1">
               {items.map((item, index) => {

@@ -16,7 +16,11 @@ import {
   User,
   LogOut,
   Menu,
+  Bell,
+  Settings,
 } from "lucide-react";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { Badge } from "@/components/ui/badge";
 
 interface AppShellProps {
   title: string;
@@ -28,7 +32,9 @@ interface AppShellProps {
 
 const memberNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/notifications", label: "Notifications", icon: Bell, badge: true },
   { href: "/profile", label: "Profile", icon: User },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 const adminNav = [
@@ -41,22 +47,26 @@ function NavLinks({
   pathname,
   onNavigate,
   className,
+  unreadCount = 0,
 }: {
   nav: typeof memberNav;
   pathname: string;
   onNavigate?: () => void;
   className?: string;
+  unreadCount?: number;
 }) {
   return (
     <nav className={cn("flex flex-col gap-1", className)}>
       {nav.map((item) => {
         const Icon = item.icon;
-        const active = pathname === item.href;
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const showBadge = "badge" in item && item.badge && unreadCount > 0;
         return (
           <Link
             key={item.href}
             to={item.href}
             onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
               active
@@ -66,6 +76,11 @@ function NavLinks({
           >
             <Icon className="h-4 w-4" />
             {item.label}
+            {showBadge && (
+              <Badge className="ml-auto h-5 min-w-5 justify-center bg-accent px-1.5 text-[10px] text-accent-foreground">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Badge>
+            )}
           </Link>
         );
       })}
@@ -82,6 +97,7 @@ export function AppShell({
 }: AppShellProps) {
   const location = useLocation();
   const nav = variant === "admin" ? adminNav : memberNav;
+  const { unreadCount } = useNotifications();
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,8 +116,8 @@ export function AppShell({
           </div>
 
           <div className="flex items-center gap-2">
-            <nav className="mr-2 hidden items-center gap-1 md:flex">
-              <NavLinks nav={nav} pathname={location.pathname} className="flex-row gap-1" />
+            <nav className="mr-2 hidden items-center gap-1 md:flex" aria-label="Main navigation">
+              <NavLinks nav={nav} pathname={location.pathname} className="flex-row gap-1" unreadCount={unreadCount} />
             </nav>
 
             <Sheet>
@@ -119,6 +135,7 @@ export function AppShell({
                   nav={nav}
                   pathname={location.pathname}
                   className="mt-6"
+                  unreadCount={unreadCount}
                 />
                 {onSignOut && (
                   <Button
@@ -149,7 +166,11 @@ export function AppShell({
         </div>
       </header>
 
-      <main className="container mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="container mx-auto max-w-7xl px-4 py-8 outline-none sm:px-6 lg:px-8"
+      >
         {children}
       </main>
     </div>
