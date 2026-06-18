@@ -42,14 +42,14 @@ export function LandingNav() {
             size="sm"
             className="hidden text-white/70 hover:bg-white/5 hover:text-white sm:inline-flex"
           >
-            <Link to="/auth">Sign in</Link>
+            <Link to="/auth/login">Sign in</Link>
           </Button>
           <Button
             asChild
             size="sm"
             className="bg-accent text-accent-foreground shadow-lg shadow-accent/20 hover:bg-accent/90"
           >
-            <Link to="/auth">Get started</Link>
+            <Link to="/auth/signup">Get started</Link>
           </Button>
         </div>
       </div>

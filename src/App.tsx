@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PageTransition } from "@/components/layout/PageTransition";
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
+import AuthRoutes from "./pages/auth/AuthRoutes";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
@@ -31,10 +31,10 @@ function AnimatedRoutes() {
           }
         />
         <Route
-          path="/auth"
+          path="/auth/*"
           element={
             <PageTransition>
-              <Auth />
+              <AuthRoutes />
             </PageTransition>
           }
         />

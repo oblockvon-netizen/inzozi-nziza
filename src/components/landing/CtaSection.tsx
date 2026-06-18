@@ -33,7 +33,7 @@ export function CtaSection() {
                 size="lg"
                 className="h-12 gap-2 bg-white px-8 text-base text-[#0a0f1a] shadow-xl hover:bg-white/90"
               >
-                <Link to="/auth">
+                <Link to="/auth/signup">
                   Get started free
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -44,7 +44,7 @@ export function CtaSection() {
                 size="lg"
                 className="h-12 border-white/20 bg-white/5 px-8 text-base text-white hover:bg-white/10"
               >
-                <Link to="/auth">Sign in to your account</Link>
+                <Link to="/auth/login">Sign in to your account</Link>
               </Button>
             </div>
             <p className="mt-8 text-sm text-white/40">
