@@ -1,38 +1,34 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Home, AlertTriangle } from "lucide-react";
+import { MarketingLayout } from "@/components/layout/MarketingLayout";
+import { Home } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
+    console.error("404:", location.pathname);
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/10 dark:from-primary/10 dark:via-accent/10 dark:to-secondary/20 relative">
-      <div className="absolute top-4 right-4 z-20">
-        <ThemeToggle />
-      </div>
-      <div className="text-center relative z-10 animate-fade-in">
-        <div className="animate-float mb-8">
-          <AlertTriangle className="h-24 w-24 text-destructive mx-auto mb-6" />
-        </div>
-        <h1 className="text-6xl font-bold mb-4 text-primary">404</h1>
-        <p className="text-xl text-muted-foreground mb-8">Oops! Page not found</p>
-        <Button asChild size="lg" className="animate-glow">
+    <MarketingLayout>
+      <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center">
+        <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          Error 404
+        </p>
+        <h1 className="mt-2 text-6xl font-semibold tracking-tight">Page not found</h1>
+        <p className="mt-4 max-w-md text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <Button asChild className="mt-8 gap-2" size="lg">
           <Link to="/">
-            <Home className="mr-2 h-4 w-4" />
-            Return to Home
+            <Home className="h-4 w-4" />
+            Return home
           </Link>
         </Button>
       </div>
-    </div>
+    </MarketingLayout>
   );
 };
 

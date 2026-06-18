@@ -8,10 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +21,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import ParticleBackground from "@/components/ParticleBackground";
+import { AppShell } from "@/components/layout/AppShell";
+import { ContributionProgress } from "@/components/dashboard/ContributionProgress";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { AnimatedProgress } from "@/components/dashboard/AnimatedProgress";
+import { SectionHeader } from "@/components/dashboard/SectionHeader";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { GlassPanel } from "@/components/ui/glass-panel";
+import { MarketingLayout } from "@/components/layout/MarketingLayout";
 import UserFines from "@/components/UserFines";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -551,221 +555,98 @@ const Dashboard = () => {
     100
   );
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-      case "approved":
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case "pending":
-        return <Clock className="h-4 w-4 text-yellow-600" />;
-      case "failed":
-      case "denied":
-        return <AlertCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusVariant = (
-    status: string
-  ): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case "completed":
-      case "approved":
-        return "default";
-      case "pending":
-        return "secondary";
-      case "failed":
-      case "denied":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
   if (loading) {
     return <LoadingSpinner message="Loading your dashboard..." />;
   }
 
   if (!profile?.is_approved) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
-        <ParticleBackground />
-        <div className="absolute top-4 right-4 z-20">
-          <ThemeToggle />
-        </div>
-        <Card className="w-full max-w-md relative z-10 animate-fade-in">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center animate-pulse">
-              <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+      <MarketingLayout>
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <GlassPanel className="w-full max-w-md text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold/10">
+              <Clock className="h-6 w-6 text-gold" />
             </div>
-            <CardTitle>Pending Approval</CardTitle>
-            <CardDescription>
-              Your account is waiting for admin approval. You'll receive an
-              email once your account is activated.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={handleSignOut}
-              variant="outline"
-              className="w-full"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+            <h2 className="text-xl font-semibold">Pending approval</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your account is waiting for admin approval. You'll receive an email
+              once your account is activated.
+            </p>
+            <Button onClick={handleSignOut} variant="outline" className="mt-6 w-full gap-2">
+              <LogOut className="h-4 w-4" />
+              Sign out
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </GlassPanel>
+        </div>
+      </MarketingLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <ParticleBackground />
-      {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-30">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-primary">Inzozi Nziza</h1>
-            <p className="text-sm text-muted-foreground">
-              Welcome back, {profile?.full_name}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Button onClick={handleSignOut} variant="outline" size="sm">
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-8 relative z-10">
-        <div className="grid gap-6 lg:grid-cols-12 animate-fade-in">
+    <AppShell
+      title="Member dashboard"
+      subtitle={`Welcome back, ${profile?.full_name}`}
+      onSignOut={handleSignOut}
+    >
+      <div className="grid gap-6 lg:grid-cols-12">
           {/* Contribution Status */}
           <Card className="lg:col-span-8">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Contribution Status
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <DollarSign className="h-5 w-5 text-accent" />
+                Contribution status
               </CardTitle>
               <CardDescription>
-                Required: {REQUIRED_CONTRIBUTION.toLocaleString()} RWF
+                Required: {REQUIRED_CONTRIBUTION.toLocaleString()} RWF per month
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {contributionProgress >= 100 ? (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-green-800">
-                        Monthly Contribution Complete!
-                      </p>
-                      <p className="text-green-700">
-                        You've met your contribution requirement for{" "}
-                        {new Date().toLocaleString("default", {
-                          month: "long",
-                          year: "numeric",
-                        })}
-                        . The next contribution period starts on{" "}
-                        {new Date(
-                          new Date().getFullYear(),
-                          new Date().getMonth() + 1,
-                          1
-                        ).toLocaleDateString()}
-                        .
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress</span>
-                    <span>
-                      {totalContributions.toLocaleString()} /{" "}
-                      {REQUIRED_CONTRIBUTION.toLocaleString()} RWF
-                    </span>
-                  </div>
-                  <Progress value={contributionProgress} className="h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    {(
-                      REQUIRED_CONTRIBUTION - totalContributions
-                    ).toLocaleString()}{" "}
-                    RWF remaining
-                  </p>
-                </div>
-              )}
-
-              {contributionProgress < 100 && (
-                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-yellow-800">
-                        Action Required
-                      </p>
-                      <p className="text-yellow-700">
-                        Complete your contribution for{" "}
-                        {new Date().toLocaleString("default", {
-                          month: "long",
-                        })}{" "}
-                        to maintain active membership.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <CardContent>
+              <ContributionProgress
+                current={totalContributions}
+                required={REQUIRED_CONTRIBUTION}
+                progressPercent={contributionProgress}
+                monthLabel={new Date().toLocaleString("default", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              />
             </CardContent>
           </Card>
 
           {/* Quick Stats */}
-          <Card className="lg:col-span-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Quick Stats
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-2xl font-bold">{contributions.length}</p>
-                <p className="text-xs text-muted-foreground">Total Payments</p>
-              </div>
-              <Separator />
-              <div>
-                <p className="text-2xl font-bold">{loans.length}</p>
-                <p className="text-xs text-muted-foreground">
-                  Loan Applications
-                </p>
-              </div>
-              <Separator />
-              <div>
-                <p className="text-2xl font-bold">
-                  {loans.filter((l) => l.status === "approved").length}
-                </p>
-                <p className="text-xs text-muted-foreground">Approved Loans</p>
-              </div>
-              <div className="pt-4 flex gap-2">
-                <Button
-                  onClick={() => setShowLoanDialog(true)}
-                  className="w-full"
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Apply for Loan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 lg:col-span-4">
+            <StatCard
+              title="Total payments"
+              value={contributions.length}
+              icon={TrendingUp}
+              index={0}
+              accent="emerald"
+            />
+            <StatCard
+              title="Loan applications"
+              value={loans.length}
+              icon={CreditCard}
+              index={1}
+              accent="navy"
+            />
+            <StatCard
+              title="Approved loans"
+              value={loans.filter((l) => l.status === "approved").length}
+              icon={CheckCircle2}
+              index={2}
+              accent="gold"
+            />
+            <Button onClick={() => setShowLoanDialog(true)} className="w-full gap-2 bg-accent hover:bg-accent/90">
+              <CreditCard className="h-4 w-4" />
+              Apply for loan
+            </Button>
+          </div>
 
           {/* Recent Activity */}
           <Card className="lg:col-span-8">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
               <div>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle className="text-lg">Recent activity</CardTitle>
                 <CardDescription>
                   Your recent contributions and loans
                 </CardDescription>
@@ -783,9 +664,10 @@ const Dashboard = () => {
               <div className="space-y-8">
                 {/* Recent Contributions */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">
-                    Recent Contributions
-                  </h3>
+                  <SectionHeader
+                    title="Recent contributions"
+                    className="mb-4"
+                  />
                   {contributions.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       No contributions yet
@@ -807,11 +689,7 @@ const Dashboard = () => {
                               ).toLocaleDateString()}
                             </p>
                           </div>
-                          <Badge
-                            variant={getStatusVariant(contribution.status)}
-                          >
-                            {contribution.status}
-                          </Badge>
+                          <StatusBadge status={contribution.status} />
                         </div>
                       ))}
                     </div>
@@ -822,7 +700,7 @@ const Dashboard = () => {
 
                 {/* Recent Fines */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Recent Fines</h3>
+                  <SectionHeader title="Recent fines" className="mb-4" />
                   {user && <UserFines userId={user.id} />}
                 </div>
 
@@ -830,7 +708,7 @@ const Dashboard = () => {
 
                 {/* Recent Loans */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Recent Loans</h3>
+                  <SectionHeader title="Recent loans" className="mb-4" />
                   {loans.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       No loan applications yet
@@ -854,9 +732,7 @@ const Dashboard = () => {
                               {new Date(loan.applied_at).toLocaleDateString()}
                             </p>
                           </div>
-                          <Badge variant={getStatusVariant(loan.status)}>
-                            {loan.status}
-                          </Badge>
+                          <StatusBadge status={loan.status} />
                         </div>
                       ))}
                     </div>
@@ -908,10 +784,11 @@ const Dashboard = () => {
                           ).toLocaleDateString()}
                         </p>
                       )}
-                      <Progress
+                      <AnimatedProgress
                         value={
                           (loan.amount_paid / loan.total_with_interest) * 100
                         }
+                        showLabel
                         className="mt-2"
                       />
                     </div>
@@ -927,7 +804,6 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
 
       {/* Loan Application Dialog */}
       <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
@@ -973,9 +849,7 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Remove Payment Dialog */}
-    </div>
+    </AppShell>
   );
 };
 

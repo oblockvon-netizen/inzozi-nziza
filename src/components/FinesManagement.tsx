@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader } from "@/components/dashboard/SectionHeader";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +22,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, Wallet, History } from "lucide-react";
@@ -287,31 +289,22 @@ export default function FinesManagement({
     link.click();
   };
 
-  const getStatusVariant = (
-    status: string
-  ): "success" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case "paid":
-        return "success";
-      case "pending":
-        return "secondary";
-      case "cancelled":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Fines Management</h2>
-        <Button onClick={downloadFinesReport} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Download Report
-        </Button>
-      </div>
+      <SectionHeader
+        title="Fines management"
+        description="Issue fines and record member payments"
+        action={
+          <Button onClick={downloadFinesReport} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Download report
+          </Button>
+        }
+      />
 
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -339,9 +332,7 @@ export default function FinesManagement({
                   {fine.reason}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getStatusVariant(fine.status)}>
-                    {fine.status}
-                  </Badge>
+                  <StatusBadge status={fine.status} />
                 </TableCell>
                 <TableCell>
                   {new Date(fine.issued_at).toLocaleDateString()}
@@ -407,8 +398,11 @@ export default function FinesManagement({
           })}
         </TableBody>
       </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {users.map((user) => (
           <Button
             key={user.user_id}

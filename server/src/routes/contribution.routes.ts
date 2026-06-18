@@ -12,6 +12,7 @@ import {
   listAllContributions,
   recordContribution,
 } from "../services/contribution.service.js";
+import { adminRateLimits } from "../middleware/rateLimit.js";
 
 export async function contributionRoutes(app: FastifyInstance): Promise<void> {
   app.get(
@@ -44,6 +45,7 @@ export async function contributionRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminRecordContribution,
       preValidation: [validateBody(recordContributionSchema)],
     },

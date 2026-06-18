@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { MarketingLayout } from "@/components/layout/MarketingLayout";
+import { GlassPanel } from "@/components/ui/glass-panel";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogIn, UserPlus, Shield, ArrowLeft, Eye, EyeOff } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Loader2, LogIn, UserPlus, Shield, Eye, EyeOff } from "lucide-react";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -175,36 +175,29 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/10 dark:from-primary/10 dark:via-accent/10 dark:to-secondary/20 p-4 relative">
-      {/* Theme toggle */}
-      <div className="absolute top-4 right-4 z-20">
-        <ThemeToggle />
-      </div>
-      
-      {/* Back to home button */}
-      <div className="absolute top-4 left-4 z-20">
-        <Button asChild variant="ghost" size="sm" className="animate-fade-in">
-          <Link to="/">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Home
-          </Link>
-        </Button>
-      </div>
+    <MarketingLayout showBack backTo="/" backLabel="Home">
+      <div className="flex min-h-screen items-center justify-center p-4 py-16">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <p className="mb-2 text-sm font-medium uppercase tracking-wider text-accent">
+              Inzozi Nziza
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Welcome back
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Sign in or create your member account
+            </p>
+          </div>
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold text-primary mb-2 animate-glow">Inzozi Nziza</h1>
-          <p className="text-muted-foreground text-lg">Community Savings & Loans Platform</p>
-        </div>
-
-        <Card className="backdrop-blur-sm bg-card/80 animate-fade-in border-2 hover:border-primary/20 transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="text-2xl">Welcome</CardTitle>
-            <CardDescription>
-              Sign in to your account or create a new one to get started
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <GlassPanel>
+            <CardHeader className="px-0 pt-0">
+              <CardTitle className="text-xl">Account access</CardTitle>
+              <CardDescription>
+                Secure access to your community savings dashboard
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 pb-0">
             {isForgotPassword ? (
               <div className="animate-fade-in">
                 <h3 className="text-lg font-semibold mb-4">Reset Password</h3>
@@ -412,10 +405,11 @@ const Auth = () => {
                 </TabsContent>
               </Tabs>
             )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </GlassPanel>
+        </div>
       </div>
-    </div>
+    </MarketingLayout>
   );
 };
 

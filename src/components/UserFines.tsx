@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { useState, useEffect } from "react";
 
 interface Fine {
   id: string;
@@ -64,21 +65,6 @@ function UserFines({ userId }: UserFinesProps) {
     }
   };
 
-  const getStatusVariant = (
-    status: string
-  ): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case "paid":
-        return "default";
-      case "pending":
-        return "secondary";
-      case "cancelled":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
   const getRemainingAmount = (fine: Fine) => {
     const totalPaid =
       fine.fine_payments?.reduce((sum, payment) => sum + payment.amount, 0) ||
@@ -91,33 +77,43 @@ function UserFines({ userId }: UserFinesProps) {
     .reduce((sum, fine) => sum + getRemainingAmount(fine), 0);
 
   if (loading) {
-    return <div>Loading fines...</div>;
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-accent" />
+        Loading fines...
+      </div>
+    );
   }
 
   if (fines.length === 0) {
-    return null;
+    return (
+      <p className="text-sm text-muted-foreground">No fines on your account</p>
+    );
   }
 
   return (
     <div>
       {totalPendingAmount > 0 && (
-        <div className="mb-4 p-4 bg-destructive/10 rounded-lg">
-          <p className="text-sm font-medium text-destructive">
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <p className="text-sm text-muted-foreground">
             You have pending fines totaling{" "}
-            {totalPendingAmount.toLocaleString()} RWF
+            <span className="font-semibold tabular-nums text-destructive">
+              {totalPendingAmount.toLocaleString()} RWF
+            </span>
           </p>
         </div>
       )}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {fines.map((fine) => {
           const remainingAmount = getRemainingAmount(fine);
           return (
             <div
               key={fine.id}
-              className="flex items-center justify-between border-b pb-2 last:border-0"
+              className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-4 py-3"
             >
               <div>
-                <p className="font-medium">
+                <p className="font-medium tabular-nums">
                   {remainingAmount.toLocaleString()} RWF
                 </p>
                 <p className="text-sm text-muted-foreground">{fine.reason}</p>
@@ -125,9 +121,7 @@ function UserFines({ userId }: UserFinesProps) {
                   Issued: {new Date(fine.issued_at).toLocaleDateString()}
                 </p>
               </div>
-              <Badge variant={getStatusVariant(fine.status)}>
-                {fine.status}
-              </Badge>
+              <StatusBadge status={fine.status} />
             </div>
           );
         })}

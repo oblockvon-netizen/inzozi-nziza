@@ -22,6 +22,7 @@ import {
   denyLoan,
   recordLoanPayment,
 } from "../services/loan.service.js";
+import { adminRateLimits } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireAnyPermission } from "../middleware/permissions.js";
 import { Permission } from "../types/rbac.js";
@@ -80,6 +81,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/:loanId/approve",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminApproveLoan,
       preValidation: [validateBody(loanDecisionSchema)],
     },
@@ -98,6 +100,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/:loanId/deny",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminDenyLoan,
       preValidation: [validateBody(loanDecisionSchema)],
     },
@@ -116,6 +119,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/:loanId/payments",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminRecordLoanPayment,
       preValidation: [validateBody(recordLoanPaymentSchema)],
     },

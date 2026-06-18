@@ -12,6 +12,7 @@ import {
   recordFinePaymentSchema,
   cancelFineSchema,
 } from "../schemas/domain.schemas.js";
+import { adminRateLimits } from "../middleware/rateLimit.js";
 import {
   listOwnFines,
   listAllFines,
@@ -42,6 +43,7 @@ export async function fineRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminIssueFine,
       preValidation: [validateBody(issueFineSchema)],
     },
@@ -63,6 +65,7 @@ export async function fineRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/:fineId/payments",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminRecordFinePayment,
       preValidation: [validateBody(recordFinePaymentSchema)],
     },
@@ -85,6 +88,7 @@ export async function fineRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/:fineId/cancel",
     {
+      ...adminRateLimits.mutations,
       preHandler: adminCancelFine,
       preValidation: [validateBody(cancelFineSchema)],
     },

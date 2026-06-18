@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import ParticleBackground from "@/components/ParticleBackground";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { User, ArrowLeft } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
+import { User } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -133,31 +132,19 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle relative">
-      <ParticleBackground />
-      <div className="absolute top-4 right-4 z-10">
-        <ThemeToggle />
-      </div>
-      <div className="absolute top-4 left-4 z-10">
-        <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
-      </div>
-      
-      <div className="container mx-auto px-4 py-20 relative z-10">
-        <div className="max-w-2xl mx-auto space-y-6">
+    <AppShell title="Profile settings" subtitle="Manage your account information">
+      <div className="mx-auto max-w-2xl space-y-6">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <User className="h-8 w-8 text-primary" />
+              <div className="rounded-full bg-accent/10 p-3">
+                <User className="h-8 w-8 text-accent" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-foreground">Profile Settings</h1>
-            <p className="text-muted-foreground">Manage your account information</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">Your profile</h2>
+            <p className="text-muted-foreground">Update personal details and password</p>
           </div>
 
-          <Card className="bg-background/80 backdrop-blur-sm border-border/50">
+          <Card className="border-border/60 shadow-sm">
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
               <CardDescription>
@@ -189,7 +176,7 @@ export default function Profile() {
             </CardContent>
           </Card>
 
-          <Card className="bg-background/80 backdrop-blur-sm border-border/50">
+          <Card className="border-border/60 shadow-sm">
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
               <CardDescription>
@@ -223,7 +210,6 @@ export default function Profile() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+    </AppShell>
   );
 }

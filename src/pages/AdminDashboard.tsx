@@ -2,8 +2,13 @@ import React from "react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { AppShell } from "@/components/layout/AppShell";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { SectionHeader } from "@/components/dashboard/SectionHeader";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { MarketingLayout } from "@/components/layout/MarketingLayout";
+import { GlassPanel } from "@/components/ui/glass-panel";
 import {
   Card,
   CardContent,
@@ -1002,27 +1007,25 @@ const AdminDashboard = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-red-600" />
+      <MarketingLayout>
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <GlassPanel className="w-full max-w-md text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <Shield className="h-6 w-6 text-destructive" />
             </div>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
+            <h2 className="text-xl font-semibold">Access denied</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
               You don't have admin privileges to access this page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
             <Button
               onClick={() => (window.location.href = "/dashboard")}
-              className="w-full"
+              className="mt-6 w-full"
             >
-              Go to Dashboard
+              Go to dashboard
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </GlassPanel>
+        </div>
+      </MarketingLayout>
     );
   }
 
@@ -1042,90 +1045,48 @@ const AdminDashboard = () => {
   const unpaidFinesCount = fines.filter(fine => !fine.paid_at).length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-30">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-primary">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              Inzozi Nziza Management
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Button onClick={handleSignOut} variant="outline" size="sm">
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {users.filter((u) => !u.is_approved).length} pending approval
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Contributions
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalContributions.toLocaleString()} RWF
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {totalPendingContributions} pending
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Loans</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalLoans.toLocaleString()} RWF
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {pendingLoans} pending approval
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Fines</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalFinesAmount.toLocaleString()} RWF
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {unpaidFinesCount} unpaid fines
-              </p>
-            </CardContent>
-          </Card>
+    <AppShell
+      title="Admin dashboard"
+      subtitle="Inzozi Nziza management"
+      variant="admin"
+      onSignOut={handleSignOut}
+    >
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total users"
+            value={users.length}
+            subtitle={`${users.filter((u) => !u.is_approved).length} pending approval`}
+            icon={Users}
+            index={0}
+            accent="navy"
+          />
+          <StatCard
+            title="Total contributions"
+            value={`${totalContributions.toLocaleString()} RWF`}
+            subtitle={`${totalPendingContributions} pending`}
+            icon={DollarSign}
+            index={1}
+            accent="emerald"
+          />
+          <StatCard
+            title="Total loans"
+            value={`${totalLoans.toLocaleString()} RWF`}
+            subtitle={`${pendingLoans} pending approval`}
+            icon={CreditCard}
+            index={2}
+            accent="gold"
+          />
+          <StatCard
+            title="Total fines"
+            value={`${totalFinesAmount.toLocaleString()} RWF`}
+            subtitle={`${unpaidFinesCount} unpaid fines`}
+            icon={AlertCircle}
+            index={3}
+          />
         </div>
 
-        <Tabs defaultValue="users" className="mt-8">
-          <TabsList>
+        <Tabs defaultValue="users" className="mt-8 space-y-6">
+          <TabsList className="w-full justify-start sm:w-auto">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="contributions">Contributions</TabsTrigger>
             <TabsTrigger value="loans">Loans</TabsTrigger>
@@ -1133,16 +1094,20 @@ const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="users" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Users</h2>
-              <Button onClick={generatePDF} variant="outline">
-                <FileText className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
+            <SectionHeader
+              title="Users"
+              description="Manage member accounts and approvals"
+              action={
+                <Button onClick={generatePDF} variant="outline" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Export report
+                </Button>
+              }
+            />
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1213,21 +1178,26 @@ const AdminDashboard = () => {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="contributions" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Contributions</h2>
-              <Button onClick={generatePDF} variant="outline">
-                <FileText className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
+            <SectionHeader
+              title="Contributions"
+              description="Track member monthly payments"
+              action={
+                <Button onClick={generatePDF} variant="outline" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Export report
+                </Button>
+              }
+            />
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1280,21 +1250,26 @@ const AdminDashboard = () => {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="loans" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Loan Applications</h2>
-              <Button onClick={generatePDF} variant="outline">
-                <FileText className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
+            <SectionHeader
+              title="Loan applications"
+              description="Review and manage member loan requests"
+              action={
+                <Button onClick={generatePDF} variant="outline" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Export report
+                </Button>
+              }
+            />
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1452,6 +1427,7 @@ const AdminDashboard = () => {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1466,7 +1442,6 @@ const AdminDashboard = () => {
             />
           </TabsContent>
         </Tabs>
-      </main>
 
       {/* Add Contribution Dialog */}
       <Dialog
@@ -1639,7 +1614,7 @@ const AdminDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppShell>
   );
 };
 
