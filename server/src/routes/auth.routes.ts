@@ -36,6 +36,7 @@ import {
   refreshCookieOptions,
   csrfCookieOptions,
   clearCookieOptions,
+  readSignedCookie,
 } from "../utils/cookies.js";
 import { generateCsrfToken } from "../lib/tokens.js";
 import type { SessionMeta } from "../types/auth.js";
@@ -103,7 +104,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     "/refresh",
     authRateLimits.refresh,
     async (request, reply) => {
-      const refreshToken = request.cookies[COOKIE_NAMES.refresh];
+      const refreshToken = readSignedCookie(request, COOKIE_NAMES.refresh);
       if (!refreshToken) {
         return reply.status(401).send({
           error: "INVALID_REFRESH_TOKEN",
@@ -121,7 +122,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.post("/logout", async (request, reply) => {
-      const refreshToken = request.cookies[COOKIE_NAMES.refresh];
+      const refreshToken = readSignedCookie(request, COOKIE_NAMES.refresh);
       await logout(refreshToken, request.authUser?.id);
       clearAuthCookies(reply);
       return reply.send({ message: "Logged out successfully" });
@@ -144,6 +145,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/reset-password",
     {
+      ...authRateLimits.resetPassword,
       preValidation: [validateBody(resetPasswordSchema)],
     },
     async (request, reply) => {
@@ -156,6 +158,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/verify-email",
     {
+      ...authRateLimits.verifyEmail,
       preValidation: [validateBody(verifyEmailSchema)],
     },
     async (request, reply) => {
@@ -192,12 +195,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/change-password",
     {
+      ...authRateLimits.changePassword,
       preHandler: [requireAuth],
       preValidation: [validateBody(changePasswordSchema)],
     },
     async (request, reply) => {
-      await changePassword(request.authUser!.id, request.body as ChangePasswordInput);
-      const refreshToken = request.cookies[COOKIE_NAMES.refresh];
+      await changePassword(
+        request.authUser!.id,
+        request.body as ChangePasswordInput,
+        request
+      );
+      const refreshToken = readSignedCookie(request, COOKIE_NAMES.refresh);
       await logout(refreshToken, request.authUser!.id);
       clearAuthCookies(reply);
       return reply.send({

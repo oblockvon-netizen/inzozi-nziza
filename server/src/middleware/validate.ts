@@ -22,8 +22,18 @@ export function validateQuery<T>(schema: ZodSchema<T>) {
   };
 }
 
+export function validateParams<T>(schema: ZodSchema<T>) {
+  return async (request: FastifyRequest): Promise<void> => {
+    const result = schema.safeParse(request.params);
+    if (!result.success) {
+      throw new AppError(400, result.error.errors[0]?.message ?? "Invalid route parameters", "VALIDATION_ERROR");
+    }
+    request.params = result.data;
+  };
+}
+
 export function errorHandler(
-  error: Error,
+  error: Error & { statusCode?: number; code?: string },
   _request: FastifyRequest,
   reply: FastifyReply
 ): void {

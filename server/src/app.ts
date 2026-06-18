@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import { env, isProduction } from "./config/env.js";
 import { registerRateLimiting } from "./middleware/rateLimit.js";
 import { csrfProtection } from "./middleware/csrf.js";
+import { registerSecurityHeaders, requireJsonContentType } from "./middleware/security.js";
 import { errorHandler } from "./middleware/validate.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { adminRoutes } from "./routes/admin.routes.js";
@@ -16,7 +17,10 @@ export async function buildApp() {
   const app = Fastify({
     logger: !isProduction,
     trustProxy: true,
+    bodyLimit: 1048576,
   });
+
+  await registerSecurityHeaders(app);
 
   await app.register(cors, {
     origin: env.APP_URL,
@@ -32,6 +36,7 @@ export async function buildApp() {
 
   await registerRateLimiting(app);
 
+  app.addHook("preValidation", requireJsonContentType);
   app.addHook("preHandler", csrfProtection);
   app.setErrorHandler(errorHandler);
 

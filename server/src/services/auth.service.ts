@@ -9,9 +9,12 @@ import {
   buildVerificationEmail,
   sendEmail,
 } from "../lib/email.js";
+import { writeAuditLog } from "../lib/audit.js";
+import { AuditAction } from "../types/rbac.js";
 import { AppError } from "../utils/errors.js";
 import type { AuthUser, SessionMeta } from "../types/auth.js";
 import { buildAuthUser } from "./user.service.js";
+import type { FastifyRequest } from "fastify";
 import type {
   ForgotPasswordInput,
   LoginInput,
@@ -331,7 +334,8 @@ export async function getMe(userId: string): Promise<AuthUser> {
 
 export async function changePassword(
   userId: string,
-  input: ChangePasswordInput
+  input: ChangePasswordInput,
+  request?: FastifyRequest
 ): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
@@ -348,5 +352,13 @@ export async function changePassword(
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash },
+  });
+
+  await writeAuditLog({
+    actorId: userId,
+    action: AuditAction.PASSWORD_CHANGED,
+    entityType: "user",
+    entityId: userId,
+    request,
   });
 }

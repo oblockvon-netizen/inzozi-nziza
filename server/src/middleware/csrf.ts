@@ -17,6 +17,10 @@ const CSRF_EXEMPT_PREFIXES = [
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
+function requestPathname(url: string): string {
+  return url.split("?")[0] ?? url;
+}
+
 export async function csrfProtection(
   request: FastifyRequest,
   _reply: FastifyReply
@@ -25,9 +29,8 @@ export async function csrfProtection(
     return;
   }
 
-  const isExempt = CSRF_EXEMPT_PREFIXES.some((path) =>
-    request.url.startsWith(path)
-  );
+  const pathname = requestPathname(request.url);
+  const isExempt = CSRF_EXEMPT_PREFIXES.some((path) => pathname.startsWith(path));
   if (isExempt) {
     return;
   }
@@ -35,7 +38,13 @@ export async function csrfProtection(
   const csrfCookie = request.cookies[COOKIE_NAMES.csrf];
   const csrfHeader = request.headers["x-csrf-token"];
 
-  if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+  if (
+    !csrfCookie ||
+    !csrfHeader ||
+    typeof csrfHeader !== "string" ||
+    csrfCookie.length !== csrfHeader.length ||
+    csrfCookie !== csrfHeader
+  ) {
     throw new AppError(403, "Invalid CSRF token", "CSRF_INVALID");
   }
 }

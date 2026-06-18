@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { validateBody } from "../middleware/validate.js";
+import { validateBody, validateParams } from "../middleware/validate.js";
 import {
   memberFines,
   adminFines,
@@ -13,6 +13,7 @@ import {
   cancelFineSchema,
 } from "../schemas/domain.schemas.js";
 import { adminRateLimits } from "../middleware/rateLimit.js";
+import { fineIdParamSchema } from "../schemas/params.schemas.js";
 import {
   listOwnFines,
   listAllFines,
@@ -67,7 +68,7 @@ export async function fineRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminRecordFinePayment,
-      preValidation: [validateBody(recordFinePaymentSchema)],
+      preValidation: [validateParams(fineIdParamSchema), validateBody(recordFinePaymentSchema)],
     },
     async (request, reply) => {
       const { fineId } = request.params as { fineId: string };
@@ -90,7 +91,7 @@ export async function fineRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminCancelFine,
-      preValidation: [validateBody(cancelFineSchema)],
+      preValidation: [validateParams(fineIdParamSchema), validateBody(cancelFineSchema)],
     },
     async (request, reply) => {
       const { fineId } = request.params as { fineId: string };

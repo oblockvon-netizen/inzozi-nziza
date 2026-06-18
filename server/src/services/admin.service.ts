@@ -141,3 +141,58 @@ export async function getAdminStats() {
     requiredMonthlyContribution: REQUIRED_MONTHLY_CONTRIBUTION,
   };
 }
+
+export async function listAuditLogs(query: {
+  page: number;
+  limit: number;
+  action?: string;
+}) {
+  const skip = (query.page - 1) * query.limit;
+
+  const where = query.action ? { action: query.action } : undefined;
+
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      include: {
+        actor: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: query.limit,
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+
+  return {
+    logs: logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      entityType: log.entityType,
+      entityId: log.entityId,
+      metadata: log.metadata,
+      ipAddress: log.ipAddress,
+      userAgent: log.userAgent,
+      createdAt: log.createdAt,
+      actor: log.actor
+        ? {
+            id: log.actor.id,
+            email: log.actor.email,
+            fullName: log.actor.profile?.fullName,
+          }
+        : null,
+    })),
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
+}

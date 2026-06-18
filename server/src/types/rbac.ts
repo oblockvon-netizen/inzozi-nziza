@@ -43,6 +43,7 @@ export const AuditAction = {
   FINE_ISSUED: "fine.issued",
   FINE_PAYMENT_RECORDED: "fine.payment.recorded",
   FINE_CANCELLED: "fine.cancelled",
+  PASSWORD_CHANGED: "auth.password_changed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

@@ -54,6 +54,41 @@ export const authRateLimits = {
       },
     },
   },
+  resetPassword: {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: "1 hour",
+      },
+    },
+  },
+  verifyEmail: {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: "1 hour",
+      },
+    },
+  },
+  changePassword: {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: "1 hour",
+      },
+    },
+  },
+} as const;
+
+export const memberRateLimits = {
+  applyLoan: {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: "1 hour",
+      },
+    },
+  },
 } as const;
 
 export const adminRateLimits = {

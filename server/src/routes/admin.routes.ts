@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { validateBody } from "../middleware/validate.js";
+import { validateBody, validateQuery, validateParams } from "../middleware/validate.js";
 import {
   adminManageUsers,
   adminApproveMembers,
@@ -10,10 +10,15 @@ import {
   rejectMemberSchema,
 } from "../schemas/domain.schemas.js";
 import {
+  userIdParamSchema,
+  auditLogQuerySchema,
+} from "../schemas/params.schemas.js";
+import {
   listUsers,
   approveMember,
   rejectMember,
   getAdminStats,
+  listAuditLogs,
 } from "../services/admin.service.js";
 import { adminRateLimits } from "../middleware/rateLimit.js";
 
@@ -29,10 +34,28 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/stats",
-    { preHandler: adminOnly },
+    { ...adminRateLimits.default, preHandler: adminOnly },
     async (_request, reply) => {
       const stats = await getAdminStats();
       return reply.send({ stats });
+    }
+  );
+
+  app.get(
+    "/audit-logs",
+    {
+      ...adminRateLimits.default,
+      preHandler: adminOnly,
+      preValidation: [validateQuery(auditLogQuerySchema)],
+    },
+    async (request, reply) => {
+      const query = request.query as {
+        page: number;
+        limit: number;
+        action?: string;
+      };
+      const result = await listAuditLogs(query);
+      return reply.send(result);
     }
   );
 
@@ -41,7 +64,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminApproveMembers,
-      preValidation: [validateBody(approveMemberSchema)],
+      preValidation: [validateParams(userIdParamSchema), validateBody(approveMemberSchema)],
     },
     async (request, reply) => {
       const { userId } = request.params as { userId: string };
@@ -60,7 +83,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminApproveMembers,
-      preValidation: [validateBody(rejectMemberSchema)],
+      preValidation: [validateParams(userIdParamSchema), validateBody(rejectMemberSchema)],
     },
     async (request, reply) => {
       const { userId } = request.params as { userId: string };

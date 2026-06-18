@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { validateBody } from "../middleware/validate.js";
+import { validateBody, validateParams } from "../middleware/validate.js";
 import {
   memberLoans,
   memberApplyLoan,
@@ -22,7 +22,8 @@ import {
   denyLoan,
   recordLoanPayment,
 } from "../services/loan.service.js";
-import { adminRateLimits } from "../middleware/rateLimit.js";
+import { adminRateLimits, memberRateLimits } from "../middleware/rateLimit.js";
+import { loanIdParamSchema } from "../schemas/params.schemas.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireAnyPermission } from "../middleware/permissions.js";
 import { Permission } from "../types/rbac.js";
@@ -40,6 +41,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/mine",
     {
+      ...memberRateLimits.applyLoan,
       preHandler: memberApplyLoan,
       preValidation: [validateBody(applyLoanSchema)],
     },
@@ -65,6 +67,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     "/:loanId",
     {
+      preValidation: [validateParams(loanIdParamSchema)],
       preHandler: [
         requireAuth,
         requireAnyPermission(Permission.VIEW_ALL_LOANS, Permission.VIEW_OWN_LOANS),
@@ -83,7 +86,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminApproveLoan,
-      preValidation: [validateBody(loanDecisionSchema)],
+      preValidation: [validateParams(loanIdParamSchema), validateBody(loanDecisionSchema)],
     },
     async (request, reply) => {
       const { loanId } = request.params as { loanId: string };
@@ -102,7 +105,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminDenyLoan,
-      preValidation: [validateBody(loanDecisionSchema)],
+      preValidation: [validateParams(loanIdParamSchema), validateBody(loanDecisionSchema)],
     },
     async (request, reply) => {
       const { loanId } = request.params as { loanId: string };
@@ -121,7 +124,7 @@ export async function loanRoutes(app: FastifyInstance): Promise<void> {
     {
       ...adminRateLimits.mutations,
       preHandler: adminRecordLoanPayment,
-      preValidation: [validateBody(recordLoanPaymentSchema)],
+      preValidation: [validateParams(loanIdParamSchema), validateBody(recordLoanPaymentSchema)],
     },
     async (request, reply) => {
       const { loanId } = request.params as { loanId: string };

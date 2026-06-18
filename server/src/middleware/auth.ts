@@ -4,8 +4,22 @@ import { AppError } from "../utils/errors.js";
 import { COOKIE_NAMES } from "../utils/cookies.js";
 import { buildAuthUser } from "../services/user.service.js";
 
+function readSignedCookie(request: FastifyRequest, name: string): string | undefined {
+  const raw = request.cookies[name];
+  if (!raw) {
+    return undefined;
+  }
+
+  const unsigned = request.unsignCookie(raw);
+  if (!unsigned.valid) {
+    return undefined;
+  }
+
+  return unsigned.value;
+}
+
 function extractAccessToken(request: FastifyRequest): string | undefined {
-  const cookieToken = request.cookies[COOKIE_NAMES.access];
+  const cookieToken = readSignedCookie(request, COOKIE_NAMES.access);
   if (cookieToken) {
     return cookieToken;
   }

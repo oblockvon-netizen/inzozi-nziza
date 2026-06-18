@@ -1,4 +1,5 @@
 import type { CookieSerializeOptions } from "@fastify/cookie";
+import type { FastifyRequest } from "fastify";
 import { env, isProduction } from "../config/env.js";
 
 export const COOKIE_NAMES = {
@@ -11,6 +12,7 @@ const baseCookieOptions: CookieSerializeOptions = {
   path: "/",
   secure: isProduction,
   sameSite: isProduction ? "strict" : "lax",
+  signed: true,
 };
 
 export function accessCookieOptions(): CookieSerializeOptions {
@@ -33,6 +35,7 @@ export function csrfCookieOptions(): CookieSerializeOptions {
   return {
     ...baseCookieOptions,
     httpOnly: false,
+    signed: false,
     maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
   };
 }
@@ -42,4 +45,17 @@ export function clearCookieOptions(): CookieSerializeOptions {
     ...baseCookieOptions,
     maxAge: 0,
   };
+}
+
+export function readSignedCookie(
+  request: FastifyRequest,
+  name: string
+): string | undefined {
+  const raw = request.cookies[name];
+  if (!raw) {
+    return undefined;
+  }
+
+  const unsigned = request.unsignCookie(raw);
+  return unsigned.valid ? unsigned.value : undefined;
 }
