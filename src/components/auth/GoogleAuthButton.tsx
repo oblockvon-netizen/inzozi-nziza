@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { authApi } from "@/lib/api";
 
 function GoogleIcon() {
   return (
@@ -28,18 +29,39 @@ function GoogleIcon() {
 
 export function GoogleAuthButton() {
   const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    authApi
+      .googleStatus()
+      .then((res) => setEnabled(res.enabled))
+      .catch(() => setEnabled(false));
+  }, []);
+
   const handleClick = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    if (!enabled) {
       toast({
-        title: "Coming soon",
-        description: "Google sign-in will be available in a future release.",
+        title: "Google sign-in unavailable",
+        description:
+          "Ask your administrator to set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in server/.env",
+        variant: "destructive",
       });
-    }, 400);
+      return;
+    }
+
+    setLoading(true);
+    window.location.href = authApi.googleLoginUrl();
   };
+
+  if (enabled === null) {
+    return (
+      <Button type="button" variant="outline" className="h-11 w-full gap-2" disabled>
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Checking Google sign-in...
+      </Button>
+    );
+  }
 
   return (
     <Button
@@ -47,7 +69,7 @@ export function GoogleAuthButton() {
       variant="outline"
       className="h-11 w-full gap-2"
       onClick={handleClick}
-      disabled={loading}
+      disabled={loading || !enabled}
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />

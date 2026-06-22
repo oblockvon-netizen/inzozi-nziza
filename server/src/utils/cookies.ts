@@ -6,6 +6,7 @@ export const COOKIE_NAMES = {
   access: "inzozi_access",
   refresh: "inzozi_refresh",
   csrf: "inzozi_csrf",
+  oauthState: "inzozi_oauth_state",
 } as const;
 
 const baseCookieOptions: CookieSerializeOptions = {
@@ -37,6 +38,15 @@ export function csrfCookieOptions(): CookieSerializeOptions {
     httpOnly: false,
     signed: false,
     maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
+  };
+}
+
+export function oauthStateCookieOptions(): CookieSerializeOptions {
+  return {
+    ...baseCookieOptions,
+    httpOnly: true,
+    signed: true,
+    maxAge: 10 * 60,
   };
 }
 

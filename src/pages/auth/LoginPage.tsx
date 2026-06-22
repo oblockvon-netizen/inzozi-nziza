@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,21 @@ import { authApi, redirectForUser, ApiError } from "@/lib/api";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading, setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    const oauthMessage = searchParams.get("message");
+    if (oauthError && oauthMessage) {
+      setError(oauthMessage);
+      navigate("/auth/login", { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     if (!authLoading && user) {

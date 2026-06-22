@@ -13,6 +13,7 @@ model User {
   id                         String                   @id @default(uuid()) @db.Uuid
   email                      String                   @unique @db.VarChar(255)
   passwordHash               String                   @map("password_hash")
+  googleId                   String?                  @unique @map("google_id") @db.VarChar(255)
   emailVerifiedAt            DateTime?                @map("email_verified_at") @db.Timestamptz(6)
   failedLoginAttempts        Int                      @default(0) @map("failed_login_attempts")
   lockedUntil                DateTime?                @map("locked_until") @db.Timestamptz(6)
@@ -39,6 +40,7 @@ model User {
   userRoles                  UserRole[]
 
   @@index([email])
+  @@index([googleId])
   @@index([lastActiveAt])
   @@map("users")
 }

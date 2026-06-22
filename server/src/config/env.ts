@@ -35,6 +35,8 @@ const envSchema = z
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     SMTP_FROM: z.string().default("Inzozi Nziza <noreply@inzozi.rw>"),
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") {
@@ -80,3 +82,12 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 export const isProduction = env.NODE_ENV === "production";
+
+export function isGoogleOAuthEnabled(): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim());
+}
+
+export function googleOAuthRedirectUri(): string {
+  const base = isProduction ? env.API_URL : env.APP_URL;
+  return `${base.replace(/\/$/, "")}/api/v1/auth/google/callback`;
+}

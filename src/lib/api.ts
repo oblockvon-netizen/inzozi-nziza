@@ -117,6 +117,8 @@ async function request<T>(
 
 export const authApi = {
   initCsrf,
+  googleStatus: () => request<{ enabled: boolean }>("/api/v1/auth/google/status"),
+  googleLoginUrl: () => `${API_BASE}/api/v1/auth/google`,
   me: () => request<{ user: AuthUser }>("/api/v1/auth/me"),
   login: (body: { email: string; password: string }) =>
     request<{ user: AuthUser; csrfToken: string }>("/api/v1/auth/login", {

@@ -134,6 +134,12 @@ export async function signup(input: SignupInput, meta: SessionMeta): Promise<Aut
   return { user: authUser, tokens };
 }
 
+export async function createAuthSession(userId: string, meta: SessionMeta): Promise<AuthResponse> {
+  const authUser = await buildAuthUser(userId);
+  const tokens = await issueTokens(userId, meta);
+  return { user: authUser, tokens };
+}
+
 export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthResponse> {
   const user = await prisma.user.findUnique({
     where: { email: input.email },

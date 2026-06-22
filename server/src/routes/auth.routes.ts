@@ -29,18 +29,29 @@ import {
   resendVerification,
   getMe,
   changePassword,
+  createAuthSession,
 } from "../services/auth.service.js";
 import {
   COOKIE_NAMES,
   accessCookieOptions,
   refreshCookieOptions,
   csrfCookieOptions,
+  oauthStateCookieOptions,
   clearCookieOptions,
   readSignedCookie,
 } from "../utils/cookies.js";
 import { generateCsrfToken } from "../lib/tokens.js";
 import type { SessionMeta } from "../types/auth.js";
 import type { AuthTokens } from "../services/auth.service.js";
+import { env, isGoogleOAuthEnabled } from "../config/env.js";
+import {
+  buildGoogleAuthUrl,
+  createOAuthState,
+  exchangeGoogleCode,
+  hashOAuthState,
+} from "../lib/google-oauth.js";
+import { authenticateWithGoogle } from "../services/google-auth.service.js";
+import { AppError } from "../utils/errors.js";
 
 function sessionMeta(request: FastifyRequest): SessionMeta {
   return {
@@ -61,7 +72,69 @@ function clearAuthCookies(reply: FastifyReply): void {
   reply.clearCookie(COOKIE_NAMES.csrf, clearCookieOptions());
 }
 
+function redirectPathForUser(user: Awaited<ReturnType<typeof createAuthSession>>["user"]): string {
+  if (user.isAdmin || user.accessRole === "ADMIN") {
+    return "/admin";
+  }
+  return "/dashboard";
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/google/status", async (_request, reply) => {
+    return reply.send({ enabled: isGoogleOAuthEnabled() });
+  });
+
+  app.get("/google", async (request, reply) => {
+    if (!isGoogleOAuthEnabled()) {
+      return reply.redirect(
+        `${env.APP_URL}/auth/login?error=google_disabled&message=${encodeURIComponent("Google sign-in is not configured yet.")}`
+      );
+    }
+
+    const state = createOAuthState();
+    reply.setCookie(COOKIE_NAMES.oauthState, hashOAuthState(state), oauthStateCookieOptions());
+    return reply.redirect(buildGoogleAuthUrl(state));
+  });
+
+  app.get("/google/callback", async (request, reply) => {
+    const query = request.query as { code?: string; state?: string; error?: string };
+
+    if (query.error) {
+      return reply.redirect(
+        `${env.APP_URL}/auth/login?error=google_denied&message=${encodeURIComponent("Google sign-in was cancelled.")}`
+      );
+    }
+
+    const storedState = readSignedCookie(request, COOKIE_NAMES.oauthState);
+    reply.clearCookie(COOKIE_NAMES.oauthState, clearCookieOptions());
+
+    if (
+      !query.code ||
+      !query.state ||
+      !storedState ||
+      storedState !== hashOAuthState(query.state)
+    ) {
+      return reply.redirect(
+        `${env.APP_URL}/auth/login?error=google_state&message=${encodeURIComponent("Google sign-in expired. Please try again.")}`
+      );
+    }
+
+    try {
+      const profile = await exchangeGoogleCode(query.code);
+      const result = await authenticateWithGoogle(profile, sessionMeta(request));
+      setAuthCookies(reply, result.tokens);
+      return reply.redirect(`${env.APP_URL}${redirectPathForUser(result.user)}`);
+    } catch (error) {
+      const message =
+        error instanceof AppError
+          ? error.message
+          : "Google sign-in failed. Please try again.";
+      return reply.redirect(
+        `${env.APP_URL}/auth/login?error=google_failed&message=${encodeURIComponent(message)}`
+      );
+    }
+  });
+
   app.get("/csrf", async (_request, reply) => {
     const csrfToken = generateCsrfToken();
     reply.setCookie(COOKIE_NAMES.csrf, csrfToken, csrfCookieOptions());

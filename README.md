@@ -350,11 +350,17 @@ Details: roles are enforced in `server/src/middleware/guards.ts` and `server/src
 - Two-admin approval for sensitive actions
 - Auto-removal after 3 months inactivity
 - Real-time notifications (WebSockets)
-- Google OAuth login
+- Google OAuth login ✅ (configure `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `server/.env`)
+
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for publishing the app online.
 
 ---
 
-## Production deployment (outline)
+## Production deployment
+
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for step-by-step instructions (Vercel + Render + Neon + Google OAuth).
+
+Summary:
 
 1. Set `NODE_ENV=production` and HTTPS URLs for `APP_URL` / `API_URL`.
 2. Replace all default JWT and cookie secrets.
