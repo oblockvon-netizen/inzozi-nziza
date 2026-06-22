@@ -21,21 +21,20 @@ type PreHandler = (
 
 
 async function requireEmailVerifiedForMembers(
-
   request: FastifyRequest,
-
   reply: FastifyReply
-
 ): Promise<void> {
-
-  if (request.authUser?.accessRole === "ADMIN") {
-
+  const authUser = request.authUser;
+  if (!authUser) {
     return;
+  }
 
+  // Admins always pass; approved active members are vetted by admin approval.
+  if (authUser.accessRole === "ADMIN" || authUser.accessRole === "USER") {
+    return;
   }
 
   await requireEmailVerified(request, reply);
-
 }
 
 

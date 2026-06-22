@@ -17,7 +17,6 @@ import { DashboardSkeleton } from "@/components/ux/skeletons/DashboardSkeleton";
 import { ErrorState } from "@/components/ux/ErrorState";
 import { AppShell } from "@/components/layout/AppShell";
 import { GlassPanel } from "@/components/ui/glass-panel";
-import { MarketingLayout } from "@/components/layout/MarketingLayout";
 import { WelcomeHero } from "@/components/dashboard/user/WelcomeHero";
 import { DashboardKpiGrid } from "@/components/dashboard/user/DashboardKpiGrid";
 import { ContributionProgressSection } from "@/components/dashboard/user/ContributionProgressSection";
@@ -35,7 +34,7 @@ import {
   isStatus,
   ApiError,
 } from "@/lib/api";
-import { userIsMember } from "@/lib/auth-roles";
+import { userCanAccessFinancialFeatures, userIsPendingApproval } from "@/lib/auth-roles";
 import {
   buildActivityFeed,
   buildContributionTrends,
@@ -90,7 +89,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!user) return;
-    if (!userIsMember(user)) {
+    if (!userCanAccessFinancialFeatures(user)) {
       setLoading(false);
       return;
     }
@@ -112,7 +111,14 @@ const Dashboard = () => {
       setFines(finesRes.fines);
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Failed to load data";
-      setLoadError(message);
+      const code = error instanceof ApiError ? error.code : undefined;
+      if (code === "FORBIDDEN" || code === "EMAIL_NOT_VERIFIED" || code === "ACCOUNT_NOT_APPROVED") {
+        setLoadError(
+          "Member financial data is unavailable for your account status. You can still use Profile, Settings, and Notifications from the menu."
+        );
+      } else {
+        setLoadError(message);
+      }
       toast({ title: "Error loading data", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -280,12 +286,12 @@ const Dashboard = () => {
     return null;
   }
 
-  const isPending = !userIsMember(user);
+  const isPending = userIsPendingApproval(user);
 
   if (isPending) {
     return (
-      <MarketingLayout>
-        <div className="flex min-h-screen items-center justify-center p-4">
+      <AppShell title="My dashboard" subtitle={user.fullName} onSignOut={handleSignOut}>
+        <div className="flex min-h-[50vh] items-center justify-center p-4">
           <GlassPanel className="w-full max-w-md text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold/10">
               <Clock className="h-6 w-6 text-gold" />
@@ -293,10 +299,10 @@ const Dashboard = () => {
             <h2 className="text-xl font-semibold">Awaiting admin approval</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Your account has been created. An administrator must approve your membership
-              before you can access contributions, loans, and other features.
+              before you can access contributions, loans, and other financial features.
             </p>
             <p className="mt-3 text-xs text-muted-foreground">
-              You&apos;ll receive an email once your account is activated.
+              You can still update your profile, settings, and notifications using the menu above.
             </p>
             <Button onClick={handleSignOut} variant="outline" className="mt-6 w-full gap-2">
               <LogOut className="h-4 w-4" />
@@ -304,12 +310,12 @@ const Dashboard = () => {
             </Button>
           </GlassPanel>
         </div>
-      </MarketingLayout>
+      </AppShell>
     );
   }
 
   if (loading && !loadError) {
-    return <DashboardSkeleton />;
+    return <DashboardSkeleton subtitle={user.fullName} onSignOut={handleSignOut} />;
   }
 
   const hasData =
@@ -317,14 +323,14 @@ const Dashboard = () => {
 
   if (loadError && !hasData) {
     return (
-      <AppShell title="Analytics" subtitle={user.fullName} onSignOut={handleSignOut}>
+      <AppShell title="My dashboard" subtitle={user.fullName} onSignOut={handleSignOut}>
         <ErrorState message={loadError} onRetry={loadUserData} />
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Analytics" subtitle={user.fullName} onSignOut={handleSignOut}>
+    <AppShell title="My dashboard" subtitle={user.fullName} onSignOut={handleSignOut}>
       {loadError && (
         <ErrorState
           message={loadError}

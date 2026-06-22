@@ -7,11 +7,39 @@ import type { RecordContributionInput } from "../schemas/domain.schemas.js";
 
 const REQUIRED_MONTHLY_CONTRIBUTION = 105_000;
 
+function mapContribution(contribution: {
+  id: string;
+  userId: string;
+  amount: unknown;
+  paymentDate: Date;
+  status: string;
+  referenceNumber: string | null;
+  recordedById: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: contribution.id,
+    userId: contribution.userId,
+    amount: Number(contribution.amount),
+    paymentDate: contribution.paymentDate,
+    status: contribution.status,
+    referenceNumber: contribution.referenceNumber,
+    recordedById: contribution.recordedById,
+    notes: contribution.notes,
+    createdAt: contribution.createdAt,
+    updatedAt: contribution.updatedAt,
+  };
+}
+
 export async function listOwnContributions(userId: string) {
-  return prisma.contribution.findMany({
+  const contributions = await prisma.contribution.findMany({
     where: { userId },
     orderBy: { paymentDate: "desc" },
   });
+
+  return contributions.map(mapContribution);
 }
 
 export async function getContributionSummary(userId: string) {

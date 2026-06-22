@@ -14,6 +14,20 @@ export function userIsMember(user: AuthUser | null | undefined): boolean {
   return user.roles.includes("USER") && user.isApproved && user.status === "ACTIVE";
 }
 
+/** User can load financial dashboard data (contributions, loans, fines) */
+export function userCanAccessFinancialFeatures(
+  user: AuthUser | null | undefined
+): boolean {
+  return userIsMember(user);
+}
+
+/** Account exists but is still awaiting admin approval */
+export function userIsPendingApproval(user: AuthUser | null | undefined): boolean {
+  if (!user) return false;
+  if (userIsAdmin(user)) return false;
+  return !userIsMember(user);
+}
+
 export function userNavLabel(user: AuthUser | null | undefined): {
   admin: string;
   dashboard: string;

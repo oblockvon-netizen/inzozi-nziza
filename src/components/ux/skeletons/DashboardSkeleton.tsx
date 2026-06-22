@@ -16,9 +16,15 @@ function StatCardSkeleton() {
   );
 }
 
-export function DashboardSkeleton() {
+export function DashboardSkeleton({
+  subtitle = "Loading...",
+  onSignOut,
+}: {
+  subtitle?: string;
+  onSignOut?: () => void;
+}) {
   return (
-    <AppShell title="Analytics" subtitle="Loading...">
+    <AppShell title="My dashboard" subtitle={subtitle} onSignOut={onSignOut}>
       <div className="space-y-6" role="status" aria-busy="true" aria-label="Loading dashboard">
         <Skeleton className="h-32 w-full rounded-2xl" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
