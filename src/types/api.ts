@@ -8,6 +8,8 @@ export interface AuthUser {
   permissions: string[];
   emailVerified: boolean;
   isApproved: boolean;
+  isAdmin: boolean;
+  isMember: boolean;
   status: string;
   fullName: string;
   phone: string | null;

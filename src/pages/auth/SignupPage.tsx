@@ -12,7 +12,13 @@ import { PasswordField } from "@/components/auth/PasswordField";
 import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
 import { useAuth } from "@/contexts/AuthContext";
 import { authApi, redirectForUser, ApiError } from "@/lib/api";
-import { evaluatePasswordStrength } from "@/lib/password-strength";
+import { evaluatePasswordStrength, passwordsMatch } from "@/lib/password-strength";
+import {
+  normalizeRwandaPhone,
+  isValidRwandaPhone,
+  RWANDA_PHONE_ERROR,
+  RWANDA_PHONE_HINT,
+} from "@/lib/phone-validation";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -21,9 +27,10 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -34,7 +41,17 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
+    setPhoneError(null);
+
+    if (!phone.trim()) {
+      setPhoneError("Phone number is required");
+      return;
+    }
+
+    if (!isValidRwandaPhone(phone)) {
+      setPhoneError(RWANDA_PHONE_ERROR);
+      return;
+    }
 
     const strength = evaluatePasswordStrength(password);
     if (strength.score < 4) {
@@ -42,21 +59,30 @@ export default function SignupPage() {
       return;
     }
 
+    if (!passwordsMatch(password, confirmPassword)) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
     try {
+      const normalizedPhone = normalizeRwandaPhone(phone.trim());
+      if (!normalizedPhone) {
+        setPhoneError(RWANDA_PHONE_ERROR);
+        setLoading(false);
+        return;
+      }
       const { user: newUser } = await authApi.signup({
         email,
         password,
-        fullName,
-        phone: phone || undefined,
+        fullName: fullName.trim(),
+        phone: normalizedPhone,
       });
       setUser(newUser);
-      setSuccess(
-        "Account created! Check your email to verify. Your membership requires admin approval."
-      );
-      setTimeout(() => {
-        navigate(redirectForUser(newUser), { replace: true });
-      }, 2000);
+      navigate(redirectForUser(newUser), {
+        replace: true,
+        state: { pendingSignup: true },
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Sign up failed");
     } finally {
@@ -75,28 +101,23 @@ export default function SignupPage() {
     >
       <AuthFormShell>
         {error && <AuthAlert variant="error" message={error} />}
-        {success && <AuthAlert variant="success" title="Success" message={success} />}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="signup-name" className="text-white/80">
-              Full name
-            </Label>
+            <Label htmlFor="signup-name">Full name</Label>
             <Input
               id="signup-name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               autoComplete="name"
               required
+              minLength={2}
               placeholder="Jean-Paul Mugisha"
-              className="border-white/10 bg-white/5 text-white placeholder:text-white/30 focus-visible:ring-accent"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="signup-email" className="text-white/80">
-              Email
-            </Label>
+            <Label htmlFor="signup-email">Email</Label>
             <Input
               id="signup-email"
               type="email"
@@ -105,23 +126,27 @@ export default function SignupPage() {
               autoComplete="email"
               required
               placeholder="you@example.com"
-              className="border-white/10 bg-white/5 text-white placeholder:text-white/30 focus-visible:ring-accent"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="signup-phone" className="text-white/80">
-              Phone <span className="text-white/40">(optional)</span>
-            </Label>
+            <Label htmlFor="signup-phone">Phone</Label>
             <Input
               id="signup-phone"
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (phoneError) setPhoneError(null);
+              }}
               autoComplete="tel"
-              placeholder="+250 788 000 000"
-              className="border-white/10 bg-white/5 text-white placeholder:text-white/30 focus-visible:ring-accent"
+              required
+              placeholder="+250 788 123 456"
+              aria-invalid={!!phoneError}
             />
+            <p className={`text-xs ${phoneError ? "text-destructive" : "text-muted-foreground"}`}>
+              {phoneError ?? RWANDA_PHONE_HINT}
+            </p>
           </div>
 
           <PasswordField
@@ -133,10 +158,22 @@ export default function SignupPage() {
           />
           <PasswordStrengthMeter password={password} />
 
+          <PasswordField
+            id="signup-confirm"
+            label="Confirm password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+          />
+          {confirmPassword && !passwordsMatch(password, confirmPassword) && (
+            <p className="text-xs text-destructive">Passwords do not match</p>
+          )}
+
           <Button
             type="submit"
             className="h-11 w-full gap-2 bg-accent text-accent-foreground shadow-lg shadow-accent/20 hover:bg-accent/90"
-            disabled={loading || !!success}
+            disabled={loading}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -147,7 +184,7 @@ export default function SignupPage() {
           </Button>
         </form>
 
-        <p className="text-center text-sm text-white/50">
+        <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link to="/auth/login" className="font-medium text-accent hover:underline">
             Sign in

@@ -9,17 +9,20 @@ import { CtaSection } from "@/components/landing/CtaSection";
 
 const Index = () => {
   return (
-    <div className="landing-page min-h-screen bg-[#0a0f1a] text-white">
-      <LandingNav />
-      <main>
-        <HeroSection />
-        <TrustMetricsSection />
-        <FeaturesSection />
-        <HowItWorksSection />
-        <TestimonialsSection />
-        <CtaSection />
-      </main>
-      <LandingFooter />
+    <div className="relative min-h-screen bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 mesh-gradient opacity-70" />
+      <div className="relative">
+        <LandingNav />
+        <main>
+          <HeroSection />
+          <TrustMetricsSection />
+          <FeaturesSection />
+          <HowItWorksSection />
+          <TestimonialsSection />
+          <CtaSection />
+        </main>
+        <LandingFooter />
+      </div>
     </div>
   );
 };

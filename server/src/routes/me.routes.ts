@@ -18,6 +18,7 @@ import {
 } from "../services/notification.service.js";
 import { requireAccessRole } from "../middleware/role.js";
 import { requirePermission } from "../middleware/permissions.js";
+import { profileUpdate } from "../middleware/guards.js";
 import { Permission } from "../types/rbac.js";
 
 export async function meRoutes(app: FastifyInstance): Promise<void> {
@@ -44,11 +45,11 @@ export async function meRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     "/profile",
     {
-      preHandler: [requireAuth],
+      preHandler: profileUpdate,
       preValidation: [validateBody(updateProfileSchema)],
     },
     async (request, reply) => {
-      const body = request.body as { fullName: string; phone?: string };
+      const body = request.body as { fullName: string; phone?: string | null };
       const user = await updateProfile(request.authUser!.id, body);
       return reply.send({ user, message: "Profile updated successfully" });
     }

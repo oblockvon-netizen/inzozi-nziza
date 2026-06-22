@@ -120,13 +120,15 @@
 
   .landing-grid {
     background-image:
-      linear-gradient(to right, hsl(0 0% 100% / 0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(0 0% 100% / 0.03) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--foreground) / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
     background-size: 64px 64px;
   }
 
-  .landing-page {
-    color-scheme: dark;
+  .dark .landing-grid {
+    background-image:
+      linear-gradient(to right, hsl(0 0% 100% / 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(0 0% 100% / 0.03) 1px, transparent 1px);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -141,12 +143,6 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
-    }
-
-    .landing-page * {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
     }
   }
 }

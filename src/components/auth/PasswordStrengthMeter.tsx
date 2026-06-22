@@ -30,7 +30,7 @@ export function PasswordStrengthMeter({
               key={i}
               className={cn(
                 "h-1 flex-1 rounded-full transition-colors duration-300",
-                i < score ? barColors[score - 1] : "bg-white/10"
+                i < score ? barColors[score - 1] : "bg-muted"
               )}
             />
           ))}
@@ -38,7 +38,7 @@ export function PasswordStrengthMeter({
         <span
           className={cn(
             "text-xs font-medium",
-            score <= 1 && "text-red-400",
+            score <= 1 && "text-red-500 dark:text-red-400",
             score === 2 && "text-gold",
             score >= 3 && "text-accent"
           )}
@@ -52,7 +52,7 @@ export function PasswordStrengthMeter({
             key={rule.id}
             className={cn(
               "text-xs transition-colors",
-              rule.met ? "text-accent" : "text-white/40"
+              rule.met ? "text-accent" : "text-muted-foreground"
             )}
           >
             {rule.met ? "✓" : "○"} {rule.label}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +35,7 @@ import {
   isStatus,
   ApiError,
 } from "@/lib/api";
+import { userIsMember } from "@/lib/auth-roles";
 import {
   buildActivityFeed,
   buildContributionTrends,
@@ -54,6 +55,7 @@ interface LoanApplicationData {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [summary, setSummary] = useState<ContributionSummary | null>(null);
@@ -67,6 +69,18 @@ const Dashboard = () => {
     purpose: "",
   });
   const { toast } = useToast();
+  const pendingSignup = (location.state as { pendingSignup?: boolean } | null)?.pendingSignup;
+
+  useEffect(() => {
+    if (pendingSignup) {
+      toast({
+        title: "Account created",
+        description:
+          "Your registration is complete. An admin must approve your account before you can use member features.",
+      });
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [pendingSignup, toast, navigate, location.pathname]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -75,9 +89,12 @@ const Dashboard = () => {
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
-    if (user) {
-      loadUserData();
+    if (!user) return;
+    if (!userIsMember(user)) {
+      setLoading(false);
+      return;
     }
+    loadUserData();
   }, [user]);
 
   const loadUserData = async () => {
@@ -259,16 +276,40 @@ const Dashboard = () => {
     return <LoadingSpinner message="Loading your dashboard..." />;
   }
 
-  if (loading && !loadError) {
-    return user ? (
-      <DashboardSkeleton />
-    ) : (
-      <LoadingSpinner message="Loading your dashboard..." />
+  if (!user) {
+    return null;
+  }
+
+  const isPending = !userIsMember(user);
+
+  if (isPending) {
+    return (
+      <MarketingLayout>
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <GlassPanel className="w-full max-w-md text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold/10">
+              <Clock className="h-6 w-6 text-gold" />
+            </div>
+            <h2 className="text-xl font-semibold">Awaiting admin approval</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your account has been created. An administrator must approve your membership
+              before you can access contributions, loans, and other features.
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              You&apos;ll receive an email once your account is activated.
+            </p>
+            <Button onClick={handleSignOut} variant="outline" className="mt-6 w-full gap-2">
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+          </GlassPanel>
+        </div>
+      </MarketingLayout>
     );
   }
 
-  if (!user) {
-    return null;
+  if (loading && !loadError) {
+    return <DashboardSkeleton />;
   }
 
   const hasData =
@@ -279,31 +320,6 @@ const Dashboard = () => {
       <AppShell title="Analytics" subtitle={user.fullName} onSignOut={handleSignOut}>
         <ErrorState message={loadError} onRetry={loadUserData} />
       </AppShell>
-    );
-  }
-
-  const isPending = user.accessRole === "PENDING_USER" || !user.isApproved;
-
-  if (isPending) {
-    return (
-      <MarketingLayout>
-        <div className="flex min-h-screen items-center justify-center p-4">
-          <GlassPanel className="w-full max-w-md text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold/10">
-              <Clock className="h-6 w-6 text-gold" />
-            </div>
-            <h2 className="text-xl font-semibold">Pending approval</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Your account is waiting for admin approval. You&apos;ll receive an email
-              once your account is activated.
-            </p>
-            <Button onClick={handleSignOut} variant="outline" className="mt-6 w-full gap-2">
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </GlassPanel>
-        </div>
-      </MarketingLayout>
     );
   }
 

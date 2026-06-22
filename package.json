@@ -6,6 +6,7 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm run dev --prefix server",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

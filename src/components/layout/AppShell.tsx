@@ -18,8 +18,11 @@ import {
   Menu,
   Bell,
   Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { userIsAdmin, userNavLabel } from "@/lib/auth-roles";
 import { Badge } from "@/components/ui/badge";
 
 interface AppShellProps {
@@ -30,17 +33,39 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-const memberNav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/notifications", label: "Notifications", icon: Bell, badge: true },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: boolean;
+};
 
-const adminNav = [
-  { href: "/admin", label: "Admin", icon: Shield },
-  { href: "/dashboard", label: "Member view", icon: LayoutDashboard },
-];
+function buildMemberNav(dashboardLabel: string): NavItem[] {
+  return [
+    { href: "/dashboard", label: dashboardLabel, icon: LayoutDashboard },
+    { href: "/notifications", label: "Notifications", icon: Bell, badge: true },
+    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings },
+  ];
+}
+
+function buildNav(variant: "member" | "admin", isAdmin: boolean, labels: ReturnType<typeof userNavLabel>): NavItem[] {
+  if (variant === "admin") {
+    return [
+      { href: "/admin", label: labels.admin, icon: Shield },
+      { href: "/dashboard", label: labels.dashboard, icon: LayoutDashboard },
+    ];
+  }
+
+  if (isAdmin) {
+    return [
+      { href: "/admin", label: labels.admin, icon: Shield },
+      ...buildMemberNav(labels.dashboard),
+    ];
+  }
+
+  return buildMemberNav(labels.dashboard);
+}
 
 function NavLinks({
   nav,
@@ -49,7 +74,7 @@ function NavLinks({
   className,
   unreadCount = 0,
 }: {
-  nav: typeof memberNav;
+  nav: NavItem[];
   pathname: string;
   onNavigate?: () => void;
   className?: string;
@@ -60,7 +85,7 @@ function NavLinks({
       {nav.map((item) => {
         const Icon = item.icon;
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const showBadge = "badge" in item && item.badge && unreadCount > 0;
+        const showBadge = item.badge && unreadCount > 0;
         return (
           <Link
             key={item.href}
@@ -96,7 +121,10 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const location = useLocation();
-  const nav = variant === "admin" ? adminNav : memberNav;
+  const { user } = useAuth();
+  const isAdmin = userIsAdmin(user);
+  const labels = userNavLabel(user);
+  const nav = buildNav(variant, isAdmin, labels);
   const { unreadCount } = useNotifications();
 
   return (

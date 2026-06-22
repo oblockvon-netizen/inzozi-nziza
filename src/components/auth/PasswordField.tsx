@@ -30,9 +30,7 @@ export function PasswordField({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <Label htmlFor={id} className="text-white/80">
-        {label}
-      </Label>
+      <Label htmlFor={id}>{label}</Label>
       <div className="relative">
         <Input
           id={id}
@@ -42,13 +40,13 @@ export function PasswordField({
           autoComplete={autoComplete}
           required={required}
           placeholder={placeholder}
-          className="border-white/10 bg-white/5 pr-10 text-white placeholder:text-white/30 focus-visible:ring-accent"
+          className="pr-10"
         />
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="absolute right-0 top-0 h-full px-3 text-white/50 hover:bg-transparent hover:text-white"
+          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:bg-transparent hover:text-foreground"
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? "Hide password" : "Show password"}
         >

@@ -31,10 +31,10 @@ export function HeroSection() {
 
             <motion.h1
               variants={fadeUp}
-              className="font-display text-balance text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl"
+              className="font-display text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl"
             >
               Build wealth{" "}
-              <span className="bg-gradient-to-r from-accent to-emerald-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-accent to-emerald-600 bg-clip-text text-transparent dark:to-emerald-300">
                 together
               </span>
               , transparently
@@ -42,7 +42,7 @@ export function HeroSection() {
 
             <motion.p
               variants={fadeUp}
-              className="mt-6 max-w-xl text-lg leading-relaxed text-white/60 sm:text-xl"
+              className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl"
             >
               Inzozi Nziza helps communities save 105,000 RWF monthly, access
               fair loans, and stay accountable — with full admin oversight and
@@ -67,13 +67,13 @@ export function HeroSection() {
                 asChild
                 variant="outline"
                 size="lg"
-                className="h-12 border-white/15 bg-white/5 px-8 text-base text-white hover:bg-white/10 hover:text-white"
+                className="h-12 border-border bg-muted/50 px-8 text-base hover:bg-muted"
               >
                 <a href="#how-it-works">See how it works</a>
               </Button>
             </motion.div>
 
-            <motion.p variants={fadeUp} className="mt-6 text-sm text-white/40">
+            <motion.p variants={fadeUp} className="mt-6 text-sm text-muted-foreground">
               No hidden fees · Admin-approved membership · Bank-grade security
             </motion.p>
           </motion.div>

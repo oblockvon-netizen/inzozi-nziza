@@ -55,9 +55,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="login-email" className="text-white/80">
-              Email
-            </Label>
+            <Label htmlFor="login-email">Email</Label>
             <Input
               id="login-email"
               type="email"
@@ -66,7 +64,6 @@ export default function LoginPage() {
               autoComplete="email"
               required
               placeholder="you@example.com"
-              className="border-white/10 bg-white/5 text-white placeholder:text-white/30 focus-visible:ring-accent"
             />
           </div>
 
@@ -101,7 +98,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="text-center text-sm text-white/50">
+        <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link to="/auth/signup" className="font-medium text-accent hover:underline">
             Sign up

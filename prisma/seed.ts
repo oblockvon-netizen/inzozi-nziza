@@ -47,9 +47,15 @@ async function bootstrapAdmin() {
 
   if (existing) {
     const hasAdmin = existing.userRoles.some((ur) => ur.role.name === "ADMIN");
+    const hasUser = existing.userRoles.some((ur) => ur.role.name === "USER");
     if (!hasAdmin) {
       await prisma.userRole.create({
         data: { userId: existing.id, roleId: adminRole.id },
+      });
+    }
+    if (!hasUser) {
+      await prisma.userRole.create({
+        data: { userId: existing.id, roleId: userRole.id },
       });
     }
     await prisma.profile.update({

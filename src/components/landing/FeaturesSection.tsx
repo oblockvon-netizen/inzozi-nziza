@@ -58,10 +58,10 @@ export function FeaturesSection() {
           <p className="text-sm font-semibold uppercase tracking-wider text-accent">
             Features
           </p>
-          <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Everything your community needs to save and lend
           </h2>
-          <p className="mt-4 text-lg text-white/50">
+          <p className="mt-4 text-lg text-muted-foreground">
             From contributions to loan approvals — one platform, full transparency.
           </p>
         </motion.div>
@@ -80,7 +80,7 @@ export function FeaturesSection() {
                 key={feature.title}
                 variants={fadeUp}
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className={`group rounded-2xl border border-white/[0.08] bg-[#111827]/50 p-8 transition-colors hover:border-accent/30 hover:bg-[#111827]/80 ${feature.className}`}
+                className={`group rounded-2xl border border-border/60 bg-card p-8 shadow-sm transition-colors hover:border-accent/30 hover:shadow-md ${feature.className}`}
               >
                 <div className="flex items-start justify-between">
                   <div
@@ -89,13 +89,13 @@ export function FeaturesSection() {
                     <Icon className="h-6 w-6" />
                   </div>
                   {feature.wide && (
-                    <ArrowUpRight className="h-5 w-5 text-white/20 transition-colors group-hover:text-accent" />
+                    <ArrowUpRight className="h-5 w-5 text-muted-foreground/50 transition-colors group-hover:text-accent" />
                   )}
                 </div>
-                <h3 className="mt-6 text-xl font-semibold text-white">
+                <h3 className="mt-6 text-xl font-semibold text-foreground">
                   {feature.title}
                 </h3>
-                <p className="mt-3 leading-relaxed text-white/50">
+                <p className="mt-3 leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>
               </motion.div>

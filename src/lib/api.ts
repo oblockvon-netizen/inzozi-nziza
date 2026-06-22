@@ -37,7 +37,11 @@ export async function initCsrf(): Promise<string> {
     credentials: "include",
   });
   if (!res.ok) {
-    throw new ApiError("Failed to initialize CSRF token", res.status);
+    const devHint =
+      import.meta.env.DEV && res.status >= 500
+        ? " Start the API server with: cd server && npm run dev"
+        : "";
+    throw new ApiError(`Failed to initialize CSRF token.${devHint}`, res.status);
   }
   const data = (await res.json()) as { csrfToken: string };
   csrfToken = data.csrfToken;
@@ -165,7 +169,7 @@ export const authApi = {
 };
 
 export const meApi = {
-  updateProfile: (body: { fullName: string; phone?: string }) =>
+  updateProfile: (body: { fullName: string; phone?: string | null }) =>
     request<{ user: AuthUser; message: string }>("/api/v1/me/profile", {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -290,8 +294,11 @@ export const adminApi = {
     ),
 };
 
+import type { AuthUser } from "@/types/api";
+
 export function redirectForUser(user: AuthUser): string {
-  if (user.accessRole === "ADMIN") return "/admin";
+  if (user.isAdmin || user.accessRole === "ADMIN") return "/admin";
+  if (user.accessRole === "PENDING_USER" || !user.isApproved) return "/dashboard";
   return "/dashboard";
 }
 

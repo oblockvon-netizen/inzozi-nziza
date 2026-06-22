@@ -128,7 +128,7 @@ export default function ResetPasswordPage() {
             autoComplete="new-password"
           />
           {confirmPassword && !passwordsMatch(password, confirmPassword) && (
-            <p className="text-xs text-red-400">Passwords do not match</p>
+            <p className="text-xs text-destructive">Passwords do not match</p>
           )}
 
           <Button

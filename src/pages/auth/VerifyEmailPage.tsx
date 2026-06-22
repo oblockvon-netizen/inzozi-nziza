@@ -66,7 +66,7 @@ export default function VerifyEmailPage() {
       <AuthLayout title="Verifying email" subtitle="Please wait a moment...">
         <div className="flex flex-col items-center gap-4 py-8">
           <Loader2 className="h-10 w-10 animate-spin text-accent" />
-          <p className="text-sm text-white/50">Confirming your email address...</p>
+          <p className="text-sm text-muted-foreground">Confirming your email address...</p>
         </div>
       </AuthLayout>
     );
@@ -103,8 +103,8 @@ export default function VerifyEmailPage() {
       >
         <div className="space-y-6">
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 ring-2 ring-red-500/30">
-              <XCircle className="h-7 w-7 text-red-400" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 ring-2 ring-destructive/30">
+              <XCircle className="h-7 w-7 text-destructive" />
             </div>
             <AuthAlert variant="error" message={message} />
           </div>
@@ -117,13 +117,11 @@ export default function VerifyEmailPage() {
             />
           ) : (
             <form onSubmit={handleResend} className="space-y-4">
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-muted-foreground">
                 Enter your email to receive a new verification link:
               </p>
               <div className="space-y-2">
-                <Label htmlFor="resend-email" className="text-white/80">
-                  Email
-                </Label>
+                <Label htmlFor="resend-email">Email</Label>
                 <Input
                   id="resend-email"
                   type="email"
@@ -131,13 +129,12 @@ export default function VerifyEmailPage() {
                   onChange={(e) => setResendEmail(e.target.value)}
                   required
                   placeholder="you@example.com"
-                  className="border-white/10 bg-white/5 text-white placeholder:text-white/30 focus-visible:ring-accent"
                 />
               </div>
               <Button
                 type="submit"
                 variant="outline"
-                className="h-11 w-full gap-2 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                className="h-11 w-full gap-2"
                 disabled={resendLoading}
               >
                 {resendLoading ? (
@@ -150,11 +147,7 @@ export default function VerifyEmailPage() {
             </form>
           )}
 
-          <Button
-            asChild
-            variant="ghost"
-            className="w-full text-white/60 hover:text-white"
-          >
+          <Button asChild variant="ghost" className="w-full">
             <Link to="/auth/login">Back to sign in</Link>
           </Button>
         </div>
@@ -183,9 +176,7 @@ export default function VerifyEmailPage() {
         ) : (
           <form onSubmit={handleResend} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="resend-email-idle" className="text-white/80">
-                Email
-              </Label>
+              <Label htmlFor="resend-email-idle">Email</Label>
               <Input
                 id="resend-email-idle"
                 type="email"
@@ -193,7 +184,6 @@ export default function VerifyEmailPage() {
                 onChange={(e) => setResendEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
-                className="border-white/10 bg-white/5 text-white placeholder:text-white/30 focus-visible:ring-accent"
               />
             </div>
             <Button
@@ -211,7 +201,7 @@ export default function VerifyEmailPage() {
           </form>
         )}
 
-        <p className="text-center text-sm text-white/50">
+        <p className="text-center text-sm text-muted-foreground">
           <Link to="/auth/login" className="font-medium text-accent hover:underline">
             Back to sign in
           </Link>

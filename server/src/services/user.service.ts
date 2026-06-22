@@ -17,6 +17,10 @@ export async function buildAuthUser(userId: string): Promise<AuthUser> {
   }
 
   const roles = user.userRoles.map((ur) => ur.role.name);
+  const isAdmin = roles.includes("ADMIN");
+  const isMember =
+    isAdmin ||
+    (roles.includes("USER") && user.profile.isApproved && user.profile.status === "ACTIVE");
   const accessRole = resolveAccessRole({
     roles,
     isApproved: user.profile.isApproved,
@@ -31,6 +35,8 @@ export async function buildAuthUser(userId: string): Promise<AuthUser> {
     permissions: [...getPermissions(accessRole)],
     emailVerified: Boolean(user.emailVerifiedAt),
     isApproved: user.profile.isApproved,
+    isAdmin,
+    isMember,
     status: user.profile.status,
     fullName: user.profile.fullName,
     phone: user.profile.phone,
@@ -39,14 +45,19 @@ export async function buildAuthUser(userId: string): Promise<AuthUser> {
 
 export async function updateProfile(
   userId: string,
-  input: { fullName: string; phone?: string }
+  input: { fullName: string; phone?: string | null }
 ): Promise<AuthUser> {
+  const data: { fullName: string; phone?: string | null } = {
+    fullName: input.fullName,
+  };
+
+  if (input.phone !== undefined) {
+    data.phone = input.phone;
+  }
+
   await prisma.profile.update({
     where: { userId },
-    data: {
-      fullName: input.fullName,
-      phone: input.phone ?? null,
-    },
+    data,
   });
 
   return buildAuthUser(userId);

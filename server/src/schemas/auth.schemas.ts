@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sanitizeEmail, sanitizeOptionalText, sanitizeText } from "../lib/sanitize.js";
+import { normalizeRwandaPhone } from "../lib/phone.js";
 
 const passwordSchema = z
   .string()
@@ -9,15 +10,29 @@ const passwordSchema = z
   .regex(/[A-Z]/, "Password must contain an uppercase letter")
   .regex(/[0-9]/, "Password must contain a number");
 
+const phoneField = z
+  .string()
+  .min(1, "Phone number is required")
+  .max(30)
+  .transform((value) => {
+    const normalized = normalizeRwandaPhone(value);
+    if (!normalized) {
+      throw new z.ZodError([
+        {
+          code: "custom",
+          message: "Enter a valid Rwanda phone number (e.g. +250788123456 or 0788123456)",
+          path: ["phone"],
+        },
+      ]);
+    }
+    return normalized;
+  });
+
 export const signupSchema = z.object({
   email: z.string().email().max(255).transform(sanitizeEmail),
   password: passwordSchema,
   fullName: z.string().min(2).max(120).transform(sanitizeText),
-  phone: z
-    .string()
-    .max(30)
-    .optional()
-    .transform((value) => (value ? sanitizeText(value) : undefined)),
+  phone: phoneField,
 });
 
 export const loginSchema = z.object({

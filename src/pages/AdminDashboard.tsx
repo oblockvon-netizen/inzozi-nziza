@@ -416,7 +416,7 @@ const AdminDashboard = () => {
   return (
     <AppShell
       title="Operations center"
-      subtitle="Inzozi Nziza admin"
+      subtitle="Group operations — your personal dashboard is under My dashboard"
       variant="admin"
       onSignOut={handleSignOut}
     >

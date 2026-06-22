@@ -45,7 +45,7 @@ export function GoogleAuthButton() {
     <Button
       type="button"
       variant="outline"
-      className="h-11 w-full gap-2 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+      className="h-11 w-full gap-2"
       onClick={handleClick}
       disabled={loading}
     >

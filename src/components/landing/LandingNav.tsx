@@ -8,7 +8,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 import { Menu } from "lucide-react";
 
 const navLinks = [
@@ -19,13 +18,13 @@ const navLinks = [
 
 export function LandingNav() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0a0f1a]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between gap-4 px-4">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30">
             <span className="text-sm font-bold text-accent">IN</span>
           </div>
-          <span className="text-lg font-semibold tracking-tight text-white">
+          <span className="text-lg font-semibold tracking-tight text-foreground">
             Inzozi Nziza
           </span>
         </Link>
@@ -35,7 +34,7 @@ export function LandingNav() {
             <a
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-white/60 transition-colors hover:text-white"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
             </a>
@@ -45,32 +44,28 @@ export function LandingNav() {
         <div className="flex items-center gap-2">
           <Sheet>
             <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white/70 hover:bg-white/5 hover:text-white md:hidden"
-              >
+              <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Open navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="border-white/10 bg-[#0a0f1a] text-white">
+            <SheetContent side="right" className="w-72">
               <SheetHeader>
-                <SheetTitle className="text-left text-white">Menu</SheetTitle>
+                <SheetTitle className="text-left">Menu</SheetTitle>
               </SheetHeader>
               <nav className="mt-6 flex flex-col gap-2" aria-label="Mobile landing navigation">
                 {navLinks.map((link) => (
                   <a
                     key={link.href}
                     href={link.href}
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     {link.label}
                   </a>
                 ))}
                 <Link
                   to="/auth/login"
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   Sign in
                 </Link>
@@ -78,13 +73,8 @@ export function LandingNav() {
             </SheetContent>
           </Sheet>
 
-          <ThemeToggle className={cn("text-white/70 hover:text-white")} />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="hidden text-white/70 hover:bg-white/5 hover:text-white sm:inline-flex"
-          >
+          <ThemeToggle />
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <Link to="/auth/login">Sign in</Link>
           </Button>
           <Button

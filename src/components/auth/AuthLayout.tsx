@@ -14,16 +14,16 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen bg-[#0a0f1a] lg:grid lg:grid-cols-2">
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-2">
       {/* Mobile header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-4 lg:hidden">
+      <div className="flex items-center justify-between border-b border-border/60 bg-background px-4 py-4 lg:hidden">
         <Link to="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15">
             <span className="text-xs font-bold text-accent">IN</span>
           </div>
-          <span className="font-semibold text-white">Inzozi Nziza</span>
+          <span className="font-semibold text-foreground">Inzozi Nziza</span>
         </Link>
-        <ThemeToggle className="border-white/15 bg-white/5 text-white/70" />
+        <ThemeToggle />
       </div>
 
       {/* Left branding — desktop only */}
@@ -32,18 +32,13 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       </div>
 
       {/* Right form panel */}
-      <div className="relative flex min-h-[calc(100vh-65px)] flex-col lg:min-h-screen">
+      <div className="relative flex min-h-[calc(100vh-65px)] flex-col bg-background lg:min-h-screen">
         <div className="absolute right-4 top-4 z-10 hidden lg:block">
-          <ThemeToggle className="border-white/15 bg-white/5 text-white/70" />
+          <ThemeToggle />
         </div>
 
         <div className="absolute left-4 top-4 z-10">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-white/60 hover:bg-white/5 hover:text-white"
-          >
+          <Button asChild variant="ghost" size="sm" className="gap-2 text-muted-foreground">
             <Link to="/">
               <ArrowLeft className="h-4 w-4" />
               Home
@@ -59,15 +54,15 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             className="w-full max-w-md"
           >
             <div className="mb-8">
-              <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              <h2 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 {title}
               </h2>
               {subtitle && (
-                <p className="mt-2 text-sm text-white/50 sm:text-base">{subtitle}</p>
+                <p className="mt-2 text-sm text-muted-foreground sm:text-base">{subtitle}</p>
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/[0.08] bg-[#111827]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-8">
+            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8">
               {children}
             </div>
           </motion.div>

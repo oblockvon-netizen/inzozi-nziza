@@ -14,8 +14,8 @@ export function AuthFormShell({ children, showGoogle = true }: AuthFormShellProp
         <>
           <GoogleAuthButton />
           <div className="relative">
-            <Separator className="bg-white/10" />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#111827] px-3 text-xs text-white/40">
+            <Separator />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
               or continue with email
             </span>
           </div>

@@ -43,10 +43,10 @@ export function TestimonialsSection() {
           <p className="text-sm font-semibold uppercase tracking-wider text-accent">
             Testimonials
           </p>
-          <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Trusted by community leaders
           </h2>
-          <p className="mt-4 text-lg text-white/50">
+          <p className="mt-4 text-lg text-muted-foreground">
             Real stories from members building financial security together.
           </p>
         </motion.div>
@@ -63,7 +63,7 @@ export function TestimonialsSection() {
               key={item.name}
               variants={fadeUp}
               whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              className="flex flex-col rounded-2xl border border-white/[0.08] bg-[#111827]/50 p-8 transition-colors hover:border-white/15"
+              className="flex flex-col rounded-2xl border border-border/60 bg-card p-8 shadow-sm transition-colors hover:border-accent/20 hover:shadow-md"
             >
               <div className="flex gap-0.5">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -73,18 +73,18 @@ export function TestimonialsSection() {
                   />
                 ))}
               </div>
-              <blockquote className="mt-5 flex-1 text-base leading-relaxed text-white/70">
+              <blockquote className="mt-5 flex-1 text-base leading-relaxed text-muted-foreground">
                 &ldquo;{item.quote}&rdquo;
               </blockquote>
-              <div className="mt-6 flex items-center gap-3 border-t border-white/[0.06] pt-6">
+              <div className="mt-6 flex items-center gap-3 border-t border-border/60 pt-6">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${item.accent} text-sm font-semibold text-white`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${item.accent} text-sm font-semibold text-foreground`}
                 >
                   {item.initials}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">{item.name}</p>
-                  <p className="text-xs text-white/50">{item.role}</p>
+                  <p className="text-sm font-semibold text-foreground">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">{item.role}</p>
                 </div>
               </div>
             </motion.div>

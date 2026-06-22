@@ -10,15 +10,15 @@ const config: Record<
 > = {
   error: {
     icon: AlertCircle,
-    className: "border-red-500/30 bg-red-500/10 text-red-200",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
   },
   success: {
     icon: CheckCircle2,
-    className: "border-accent/30 bg-accent/10 text-emerald-200",
+    className: "border-accent/30 bg-accent/10 text-accent",
   },
   info: {
     icon: Info,
-    className: "border-gold/30 bg-gold/10 text-amber-100",
+    className: "border-gold/30 bg-gold/10 text-gold",
   },
 };
 
